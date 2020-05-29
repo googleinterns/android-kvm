@@ -175,23 +175,11 @@ extern char __smccc_workaround_1_smc[__SMCCC_WORKAROUND_1_SMC_SZ];
 
 #else /* __ASSEMBLY__ */
 
-.macro hyp_adr_this_cpu reg, sym, tmp
-	adr_l	\reg, \sym
-	mrs	\tmp, tpidr_el2
-	add	\reg, \reg, \tmp
-.endm
-
-.macro hyp_ldr_this_cpu reg, sym, tmp
-	adr_l	\reg, \sym
-	mrs	\tmp, tpidr_el2
-	ldr	\reg,  [\reg, \tmp]
-.endm
-
 .macro get_hyp_ctxt reg, tmp
 #ifdef __KVM_NVHE_HYPERVISOR__
-	hyp_adr_this_cpu \reg, kvm_hyp_ctxt, \tmp
+	adr_this_cpu \reg, kvm_hyp_ctxt, \tmp
 #else
-	hyp_adr_this_cpu \reg, kvm_host_ctxt, \tmp
+	adr_this_cpu \reg, kvm_host_ctxt, \tmp
 #endif
 .endm
 
