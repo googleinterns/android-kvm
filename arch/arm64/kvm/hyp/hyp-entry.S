@@ -96,7 +96,7 @@ el1_hvc_guest:
 alternative_cb	arm64_enable_wa2_handling
 	b	wa2_end
 alternative_cb_end
-	get_vcpu_ptr	x2, x0
+	hyp_ldr_this_cpu x2, kvm_hyp_running_vcpu, x0
 	ldr	x0, [x2, #VCPU_WORKAROUND_FLAGS]
 
 	// Sanitize the argument and update the guest flags
@@ -128,17 +128,17 @@ wa_epilogue:
 	sb
 
 el1_trap:
-	get_vcpu_ptr	x1, x0
+	hyp_ldr_this_cpu x1, kvm_hyp_running_vcpu, x0
 	mov	x0, #ARM_EXCEPTION_TRAP
 	b	__guest_exit
 
 el1_irq:
-	get_vcpu_ptr	x1, x0
+	hyp_ldr_this_cpu x1, kvm_hyp_running_vcpu, x0
 	mov	x0, #ARM_EXCEPTION_IRQ
 	b	__guest_exit
 
 el1_error:
-	get_vcpu_ptr	x1, x0
+	hyp_ldr_this_cpu x1, kvm_hyp_running_vcpu, x0
 	mov	x0, #ARM_EXCEPTION_EL1_SERROR
 	b	__guest_exit
 
@@ -151,7 +151,7 @@ el2_sync:
 	b.eq	__hyp_panic
 
 	/* Let's attempt a recovery from the illegal exception return */
-	get_vcpu_ptr	x1, x0
+	hyp_ldr_this_cpu x1, kvm_hyp_running_vcpu, x0
 	mov	x0, #ARM_EXCEPTION_IL
 	b	__guest_exit
 
