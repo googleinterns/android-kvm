@@ -12,12 +12,24 @@
 
 void __debug_switch_to_guest(struct kvm_vcpu *vcpu)
 {
-	__debug_switch_to_guest_common(vcpu);
+	struct kvm_cpu_context *host_ctxt;
+	struct kvm_guest_debug_arch *host_dbg;
+
+	host_ctxt = &__hyp_this_cpu_ptr(kvm_host_data)->host_ctxt;
+	host_dbg = &vcpu->arch.host_debug_state.regs;
+
+	__debug_switch_to_guest_common(vcpu, host_dbg, host_ctxt);
 }
 
 void __debug_switch_to_host(struct kvm_vcpu *vcpu)
 {
-	__debug_switch_to_host_common(vcpu);
+	struct kvm_cpu_context *host_ctxt;
+	struct kvm_guest_debug_arch *host_dbg;
+
+	host_ctxt = &__hyp_this_cpu_ptr(kvm_host_data)->host_ctxt;
+	host_dbg = &vcpu->arch.host_debug_state.regs;
+
+	__debug_switch_to_host_common(vcpu, host_dbg, host_ctxt);
 }
 
 u32 __kvm_get_mdcr_el2(void)
