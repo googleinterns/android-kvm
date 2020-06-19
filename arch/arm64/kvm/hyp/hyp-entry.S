@@ -95,7 +95,7 @@ el2_sync:
 
 	/* if this was something else, then panic! */
 	tst	x0, #PSR_IL_BIT
-	b.eq	__hyp_panic
+	b.eq	hyp_panic
 
 	/* Let's attempt a recovery from the illegal exception return */
 	hyp_ldr_this_cpu x1, kvm_hyp_running_vcpu, x0
@@ -123,7 +123,7 @@ el2_error:
 	cmp	x0, x1
 	adr	x1, abort_guest_exit_end
 	ccmp	x0, x1, #4, ne
-	b.ne	__hyp_panic
+	b.ne	hyp_panic
 	eret
 	sb
 
@@ -139,12 +139,7 @@ SYM_FUNC_START(__hyp_do_panic)
 SYM_FUNC_END(__hyp_do_panic)
 #endif
 
-SYM_CODE_START(__hyp_panic)
-	get_host_ctxt x0, x1
-	b	hyp_panic
-SYM_CODE_END(__hyp_panic)
-
-.macro invalid_vector	label, target = __hyp_panic
+.macro invalid_vector	label, target = hyp_panic
 	.align	2
 SYM_CODE_START(\label)
 	b \target
