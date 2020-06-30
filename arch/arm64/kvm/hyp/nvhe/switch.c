@@ -94,6 +94,9 @@ static void __deactivate_vm(struct kvm_vcpu *vcpu)
 /* Save VGICv3 state on non-VHE systems */
 static void __hyp_vgic_save_state(struct kvm_vcpu *vcpu)
 {
+	if (vcpu->arch.ctxt.is_host)
+		return;
+
 	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif)) {
 		__vgic_v3_save_state(&vcpu->arch.vgic_cpu.vgic_v3);
 		__vgic_v3_deactivate_traps(&vcpu->arch.vgic_cpu.vgic_v3);
@@ -103,6 +106,9 @@ static void __hyp_vgic_save_state(struct kvm_vcpu *vcpu)
 /* Restore VGICv3 state on non_VEH systems */
 static void __hyp_vgic_restore_state(struct kvm_vcpu *vcpu)
 {
+	if (vcpu->arch.ctxt.is_host)
+		return;
+
 	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif)) {
 		__vgic_v3_activate_traps(&vcpu->arch.vgic_cpu.vgic_v3);
 		__vgic_v3_restore_state(&vcpu->arch.vgic_cpu.vgic_v3);
@@ -169,7 +175,6 @@ static void __kvm_vcpu_switch_to_guest(struct kvm_vcpu *host_vcpu,
 	__activate_vm(kern_hyp_va(vcpu->arch.hw_mmu));
 	__activate_traps(vcpu);
 
-	__hyp_vgic_restore_state(vcpu);
 	__timer_enable_traps(vcpu);
 
 	__debug_switch_to_guest(host_vcpu, vcpu);
@@ -179,7 +184,6 @@ static void __kvm_vcpu_switch_to_host(struct kvm_vcpu *host_vcpu,
 				      struct kvm_vcpu *vcpu)
 {
 	__timer_disable_traps(vcpu);
-	__hyp_vgic_save_state(vcpu);
 
 	__deactivate_traps(host_vcpu, vcpu);
 	__deactivate_vm(vcpu);
@@ -206,6 +210,7 @@ static void __vcpu_save_state(struct kvm_vcpu *vcpu)
 {
 	__sysreg_save_state_nvhe(&vcpu->arch.ctxt);
 	__sysreg32_save_state(vcpu);
+	__hyp_vgic_save_state(vcpu);
 }
 
 static void __vcpu_restore_state(struct kvm_vcpu *vcpu)
@@ -222,6 +227,8 @@ static void __vcpu_restore_state(struct kvm_vcpu *vcpu)
 		__kvm_vcpu_switch_to_host(vcpu, running_vcpu);
 	else
 		__kvm_vcpu_switch_to_guest(running_vcpu, vcpu);
+
+	__hyp_vgic_restore_state(vcpu);
 
 	*__hyp_this_cpu_ptr(kvm_hyp_running_vcpu) = vcpu;
 }
