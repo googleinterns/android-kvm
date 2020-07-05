@@ -484,15 +484,15 @@ static inline bool __needs_ssbd_off(struct kvm_vcpu *vcpu)
 	if (!cpus_have_final_cap(ARM64_SSBD))
 		return false;
 
-	return !(vcpu->arch.workaround_flags & VCPU_WORKAROUND_2_FLAG);
+	return !kvm_arm_get_vcpu_workaround_2_flag(vcpu);
 }
 
-static inline void __set_guest_arch_workaround_state(struct kvm_vcpu *vcpu)
+static inline void __set_vcpu_arch_workaround_state(struct kvm_vcpu *vcpu)
 {
 #ifdef CONFIG_ARM64_SSBD
 	/*
-	 * The host runs with the workaround always present. If the
-	 * guest wants it disabled, so be it...
+	 * The hyp runs with the workaround always present. If the
+	 * vpu wants it disabled, so be it...
 	 */
 	if (__needs_ssbd_off(vcpu) &&
 	    __hyp_this_cpu_read(arm64_ssbd_callback_required))
@@ -500,11 +500,11 @@ static inline void __set_guest_arch_workaround_state(struct kvm_vcpu *vcpu)
 #endif
 }
 
-static inline void __set_host_arch_workaround_state(struct kvm_vcpu *vcpu)
+static inline void __set_hyp_arch_workaround_state(struct kvm_vcpu *vcpu)
 {
 #ifdef CONFIG_ARM64_SSBD
 	/*
-	 * If the guest has disabled the workaround, bring it back on.
+	 * If the vcpu has disabled the workaround, bring it back on.
 	 */
 	if (__needs_ssbd_off(vcpu) &&
 	    __hyp_this_cpu_read(arm64_ssbd_callback_required))
