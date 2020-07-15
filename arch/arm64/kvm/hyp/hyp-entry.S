@@ -177,7 +177,6 @@ el2_error:
 	adr	x1, abort_guest_exit_end
 	ccmp	x0, x1, #4, ne
 	b.ne	__hyp_panic
-	mov	x0, #(1 << ARM_EXIT_WITH_SERROR_BIT)
 	eret
 	sb
 
