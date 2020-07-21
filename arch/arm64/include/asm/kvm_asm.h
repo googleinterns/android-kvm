@@ -78,9 +78,10 @@
 struct kvm;
 struct kvm_vcpu;
 
-DECLARE_KVM_NVHE_SYM(__kvm_hyp_init);
+extern char __kvm_hyp_init[];
+extern char __kvm_hyp_init_end[];
+
 DECLARE_KVM_HYP_SYM(__kvm_hyp_vector);
-#define __kvm_hyp_init		CHOOSE_NVHE_SYM(__kvm_hyp_init)
 #define __kvm_hyp_vector	CHOOSE_HYP_SYM(__kvm_hyp_vector)
 
 #ifdef CONFIG_KVM_INDIRECT_VECTORS

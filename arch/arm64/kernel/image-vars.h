@@ -71,6 +71,9 @@ KVM_NVHE_ALIAS(__guest_exit);
 KVM_NVHE_ALIAS(abort_guest_exit_end);
 KVM_NVHE_ALIAS(abort_guest_exit_start);
 
+/* Symbols defined in hyp-init.S (not yet compiled with nVHE build rules). */
+KVM_NVHE_ALIAS(__kvm_handle_stub_hvc);
+
 /* Symbols defined in switch.c (not yet compiled with nVHE build rules). */
 KVM_NVHE_ALIAS(__kvm_vcpu_run_nvhe);
 KVM_NVHE_ALIAS(hyp_panic);
@@ -109,9 +112,6 @@ KVM_NVHE_ALIAS(kimage_voffset);
 
 /* Kernel symbols used to call panic() from nVHE hyp code (via ERET). */
 KVM_NVHE_ALIAS(panic);
-
-/* Vectors installed by hyp-init on reset HVC. */
-KVM_NVHE_ALIAS(__hyp_stub_vectors);
 
 #endif /* CONFIG_KVM */
 
