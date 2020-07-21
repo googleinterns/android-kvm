@@ -7,7 +7,6 @@
 #include <linux/linkage.h>
 
 #include <asm/alternative.h>
-#include <asm/asm-offsets.h>
 #include <asm/assembler.h>
 #include <asm/fpsimdmacros.h>
 #include <asm/kvm.h>
@@ -16,70 +15,36 @@
 #include <asm/kvm_mmu.h>
 #include <asm/kvm_ptrauth.h>
 
-#define CPU_XREG_OFFSET(x)	(CPU_USER_PT_REGS + 8*x)
-#define CPU_SP_EL0_OFFSET	(CPU_XREG_OFFSET(30) + 8)
-
 	.text
 
 /*
- * We treat x18 as callee-saved as the host may use it as a platform
- * register (e.g. for shadow call stack).
- */
-.macro save_callee_saved_regs ctxt
-	str	x18,      [\ctxt, #CPU_XREG_OFFSET(18)]
-	stp	x19, x20, [\ctxt, #CPU_XREG_OFFSET(19)]
-	stp	x21, x22, [\ctxt, #CPU_XREG_OFFSET(21)]
-	stp	x23, x24, [\ctxt, #CPU_XREG_OFFSET(23)]
-	stp	x25, x26, [\ctxt, #CPU_XREG_OFFSET(25)]
-	stp	x27, x28, [\ctxt, #CPU_XREG_OFFSET(27)]
-	stp	x29, lr,  [\ctxt, #CPU_XREG_OFFSET(29)]
-.endm
-
-.macro restore_callee_saved_regs ctxt
-	// We require \ctxt is not x18-x28
-	ldr	x18,      [\ctxt, #CPU_XREG_OFFSET(18)]
-	ldp	x19, x20, [\ctxt, #CPU_XREG_OFFSET(19)]
-	ldp	x21, x22, [\ctxt, #CPU_XREG_OFFSET(21)]
-	ldp	x23, x24, [\ctxt, #CPU_XREG_OFFSET(23)]
-	ldp	x25, x26, [\ctxt, #CPU_XREG_OFFSET(25)]
-	ldp	x27, x28, [\ctxt, #CPU_XREG_OFFSET(27)]
-	ldp	x29, lr,  [\ctxt, #CPU_XREG_OFFSET(29)]
-.endm
-
-.macro save_sp_el0 ctxt, tmp
-	mrs	\tmp,	sp_el0
-	str	\tmp,	[\ctxt, #CPU_SP_EL0_OFFSET]
-.endm
-
-.macro restore_sp_el0 ctxt, tmp
-	ldr	\tmp,	  [\ctxt, #CPU_SP_EL0_OFFSET]
-	msr	sp_el0, \tmp
-.endm
-
-/*
  * u64 __guest_enter(struct kvm_vcpu *vcpu,
- *		     struct kvm_cpu_context *host_ctxt);
+ *		     struct kvm_cpu_context *hyp_ctxt);
  */
 SYM_FUNC_START(__guest_enter)
 	// x0: vcpu
-	// x1: host context
+	// x1: hyp context
 	// x2-x17: clobbered by macros
 	// x29: guest context
 
-	// Store the host regs
+	// Store the hyp regs
 	save_callee_saved_regs x1
 
-	// Save the host's sp_el0
+	// Save the hyp's sp_el0
 	save_sp_el0	x1, x2
 
-	// Now the host state is stored if we have a pending RAS SError it must
-	// affect the host. If any asynchronous exception is pending we defer
-	// the guest entry. The DSB isn't necessary before v8.2 as any SError
-	// would be fatal.
+	// Now the hyp state is stored if we have a pending RAS SError it must
+	// affect the hyp. If physical IRQ interrupts are going to be trapped
+	// and there are already asynchronous exceptions pending then we defer
+	// the entry. The DSB isn't necessary before v8.2 as any SError would
+	// be fatal.
 alternative_if ARM64_HAS_RAS_EXTN
 	dsb	nshst
 	isb
 alternative_else_nop_endif
+	mrs	x1, hcr_el2
+	and	x1, x1, #HCR_IMO
+	cbz	x1, 1f
 	mrs	x1, isr_el1
 	cbz	x1,  1f
 	mov	x0, #ARM_EXCEPTION_IRQ
@@ -148,7 +113,7 @@ SYM_INNER_LABEL(__guest_exit, SYM_L_GLOBAL)
 	// Store the guest's sp_el0
 	save_sp_el0	x1, x2
 
-	get_host_ctxt	x2, x3
+	get_hyp_ctxt	x2, x3
 
 	// Macro ptrauth_switch_to_guest format:
 	// 	ptrauth_switch_to_host(guest cxt, host cxt, tmp1, tmp2, tmp3)
@@ -157,10 +122,10 @@ SYM_INNER_LABEL(__guest_exit, SYM_L_GLOBAL)
 	// when this feature is enabled for kernel code.
 	ptrauth_switch_to_host x1, x2, x3, x4, x5
 
-	// Restore the hosts's sp_el0
+	// Restore the hyp's sp_el0
 	restore_sp_el0 x2, x3
 
-	// Now restore the host regs
+	// Now restore the hyp regs
 	restore_callee_saved_regs x2
 
 alternative_if ARM64_HAS_RAS_EXTN
@@ -170,18 +135,31 @@ alternative_if ARM64_HAS_RAS_EXTN
 	mrs_s	x2, SYS_DISR_EL1
 	str	x2, [x1, #(VCPU_FAULT_DISR - VCPU_CONTEXT)]
 	cbz	x2, 1f
-	msr_s	SYS_DISR_EL1, xzr
 	orr	x0, x0, #(1<<ARM_EXIT_WITH_SERROR_BIT)
-1:	ret
+	nop
+1:
 alternative_else
 	dsb	sy		// Synchronize against in-flight ld/st
 	isb			// Prevent an early read of side-effect free ISR
 	mrs	x2, isr_el1
-	tbnz	x2, #8, 2f	// ISR_EL1.A
-	ret
-	nop
+	tbz	x2, #8, 2f	// ISR_EL1.A
+	orr	x0, x0, #(1<<ARM_EXIT_WITH_SERROR_BIT)
 2:
 alternative_endif
+
+	ret
+SYM_FUNC_END(__guest_enter)
+
+/*
+ * void __handle_sei(void);
+ */
+SYM_FUNC_START(__handle_sei)
+
+alternative_if ARM64_HAS_RAS_EXTN
+	msr_s	SYS_DISR_EL1, xzr
+	ret
+alternative_else_nop_endif
+
 	// We know we have a pending asynchronous abort, now is the
 	// time to flush it out. From your VAXorcist book, page 666:
 	// "Threaten me not, oh Evil one!  For I speak with
@@ -189,7 +167,6 @@ alternative_endif
 	mrs	x2, elr_el2
 	mrs	x3, esr_el2
 	mrs	x4, spsr_el2
-	mov	x5, x0
 
 	msr	daifclr, #4	// Unmask aborts
 
@@ -206,13 +183,8 @@ abort_guest_exit_end:
 
 	msr	daifset, #4	// Mask aborts
 
-	// If the exception took place, restore the EL1 exception
-	// context so that we can report some information.
-	// Merge the exception code with the SError pending bit.
-	tbz	x0, #ARM_EXIT_WITH_SERROR_BIT, 1f
 	msr	elr_el2, x2
 	msr	esr_el2, x3
 	msr	spsr_el2, x4
-	orr	x0, x0, x5
-1:	ret
-SYM_FUNC_END(__guest_enter)
+	ret
+SYM_FUNC_END(__handle_sei)

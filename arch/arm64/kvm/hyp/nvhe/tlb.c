@@ -10,6 +10,7 @@
 
 struct tlb_inv_context {
 	u64		tcr;
+	u64		sctlr;
 };
 
 static void __tlb_switch_to_guest(struct kvm_s2_mmu *mmu,
@@ -21,19 +22,23 @@ static void __tlb_switch_to_guest(struct kvm_s2_mmu *mmu,
 		/*
 		 * For CPUs that are affected by ARM 1319367, we need to
 		 * avoid a host Stage-1 walk while we have the guest's
-		 * VMID set in the VTTBR in order to invalidate TLBs.
-		 * We're guaranteed that the S1 MMU is enabled, so we can
-		 * simply set the EPD bits to avoid any further TLB fill.
+		 * VMID set in the VTTBR in order to invalidate TLBs. This
+		 * is done by setting the EPD bits in the TCR_EL1 register.
+		 * We also need to prevent TLB allocation from IPA->PA walks,
+		 * so we enable the S1 MMU.
 		 */
 		val = cxt->tcr = read_sysreg_el1(SYS_TCR);
 		val |= TCR_EPD1_MASK | TCR_EPD0_MASK;
 		write_sysreg_el1(val, SYS_TCR);
 		isb();
+		val = cxt->sctlr = read_sysreg_el1(SYS_SCTLR);
+		val |= SCTLR_ELx_M;
+		isb();
 	}
 
 	/* __load_guest_stage2() includes an ISB for the workaround. */
 	__load_guest_stage2(mmu);
-	asm(ALTERNATIVE("isb", "nop", ARM64_WORKAROUND_SPECULATIVE_AT));
+	isb();
 }
 
 static void __tlb_switch_to_host(struct tlb_inv_context *cxt)
@@ -43,7 +48,9 @@ static void __tlb_switch_to_host(struct tlb_inv_context *cxt)
 	if (cpus_have_final_cap(ARM64_WORKAROUND_SPECULATIVE_AT)) {
 		/* Ensure write of the host VMID */
 		isb();
-		/* Restore the host's TCR_EL1 */
+		/* Restore the host's SCTLR and then TCR_EL1 */
+		write_sysreg_el1(cxt->sctlr, SYS_SCTLR);
+		isb();
 		write_sysreg_el1(cxt->tcr, SYS_TCR);
 	}
 }
@@ -56,7 +63,6 @@ void __kvm_tlb_flush_vmid_ipa(struct kvm_s2_mmu *mmu,
 	dsb(ishst);
 
 	/* Switch to requested VMID */
-	mmu = kern_hyp_va(mmu);
 	__tlb_switch_to_guest(mmu, &cxt);
 
 	/*
@@ -110,7 +116,6 @@ void __kvm_tlb_flush_vmid(struct kvm_s2_mmu *mmu)
 	dsb(ishst);
 
 	/* Switch to requested VMID */
-	mmu = kern_hyp_va(mmu);
 	__tlb_switch_to_guest(mmu, &cxt);
 
 	__tlbi(vmalls12e1is);

@@ -12,6 +12,25 @@
 #include <asm/alternative.h>
 #include <asm/sysreg.h>
 
+DECLARE_PER_CPU(struct kvm_vcpu *, kvm_hyp_running_vcpu);
+#ifdef __KVM_NVHE_HYPERVISOR__
+DECLARE_PER_CPU(struct kvm_cpu_context, kvm_hyp_ctxt);
+DECLARE_PER_CPU(struct kvm_vcpu, kvm_host_vcpu);
+DECLARE_PER_CPU(u64, kvm_host_pmscr_el1);
+#else
+DECLARE_PER_CPU(struct kvm_cpu_context, kvm_host_ctxt);
+DECLARE_PER_CPU(struct kvm_guest_debug_arch, kvm_host_debug_state);
+#endif
+
+static inline struct kvm_cpu_context *get_hyp_ctxt(void)
+{
+#ifdef __KVM_NVHE_HYPERVISOR__
+	return __hyp_this_cpu_ptr(kvm_hyp_ctxt);
+#else
+	return __hyp_this_cpu_ptr(kvm_host_ctxt);
+#endif
+}
+
 #define read_sysreg_elx(r,nvh,vh)					\
 	({								\
 		u64 reg;						\
@@ -62,8 +81,7 @@ void __vgic_v3_restore_aprs(struct vgic_v3_cpu_if *cpu_if);
 int __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu);
 
 #ifdef __KVM_NVHE_HYPERVISOR__
-void __timer_enable_traps(struct kvm_vcpu *vcpu);
-void __timer_disable_traps(struct kvm_vcpu *vcpu);
+void __timer_restore_traps(struct kvm_vcpu *vcpu);
 #endif
 
 #ifdef __KVM_NVHE_HYPERVISOR__
@@ -76,8 +94,13 @@ void sysreg_save_guest_state_vhe(struct kvm_cpu_context *ctxt);
 void sysreg_restore_guest_state_vhe(struct kvm_cpu_context *ctxt);
 #endif
 
+#ifdef __KVM_NVHE_HYPERVISOR__
+void __debug_save_spe(struct kvm_vcpu *vcpu);
+void __debug_restore_spe(struct kvm_vcpu *vcpu);
+#else
 void __debug_switch_to_guest(struct kvm_vcpu *vcpu);
 void __debug_switch_to_host(struct kvm_vcpu *vcpu);
+#endif
 
 void __fpsimd_save_state(struct user_fpsimd_state *fp_regs);
 void __fpsimd_restore_state(struct user_fpsimd_state *fp_regs);
@@ -87,9 +110,11 @@ void activate_traps_vhe_load(struct kvm_vcpu *vcpu);
 void deactivate_traps_vhe_put(void);
 #endif
 
-u64 __guest_enter(struct kvm_vcpu *vcpu, struct kvm_cpu_context *host_ctxt);
+u64 __guest_enter(struct kvm_vcpu *vcpu, struct kvm_cpu_context *hyp_ctxt);
 
-void __noreturn hyp_panic(struct kvm_cpu_context *host_ctxt);
+void __handle_sei(void);
+
+void __noreturn hyp_panic(void);
 #ifdef __KVM_NVHE_HYPERVISOR__
 void __noreturn __hyp_do_panic(unsigned long, ...);
 #endif

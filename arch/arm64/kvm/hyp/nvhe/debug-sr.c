@@ -14,11 +14,16 @@
 #include <asm/kvm_hyp.h>
 #include <asm/kvm_mmu.h>
 
-static void __debug_save_spe(u64 *pmscr_el1)
+void __debug_save_spe(struct kvm_vcpu *vcpu)
 {
 	u64 reg;
+	u64 *pmscr_el1;
+
+	if (!vcpu->arch.ctxt.is_host)
+		return;
 
 	/* Clear pmscr in case of early return */
+	pmscr_el1 = __hyp_this_cpu_ptr(kvm_host_pmscr_el1);
 	*pmscr_el1 = 0;
 
 	/* SPE present on this CPU? */
@@ -46,8 +51,14 @@ static void __debug_save_spe(u64 *pmscr_el1)
 	dsb(nsh);
 }
 
-static void __debug_restore_spe(u64 pmscr_el1)
+void __debug_restore_spe(struct kvm_vcpu *vcpu)
 {
+	u64 pmscr_el1;
+
+	if (!vcpu->arch.ctxt.is_host)
+		return;
+
+	pmscr_el1 = __hyp_this_cpu_read(kvm_host_pmscr_el1);
 	if (!pmscr_el1)
 		return;
 
@@ -56,19 +67,6 @@ static void __debug_restore_spe(u64 pmscr_el1)
 
 	/* Re-enable data generation */
 	write_sysreg_s(pmscr_el1, SYS_PMSCR_EL1);
-}
-
-void __debug_switch_to_guest(struct kvm_vcpu *vcpu)
-{
-	/* Disable and flush SPE data generation */
-	__debug_save_spe(&vcpu->arch.host_debug_state.pmscr_el1);
-	__debug_switch_to_guest_common(vcpu);
-}
-
-void __debug_switch_to_host(struct kvm_vcpu *vcpu)
-{
-	__debug_restore_spe(vcpu->arch.host_debug_state.pmscr_el1);
-	__debug_switch_to_host_common(vcpu);
 }
 
 u32 __kvm_get_mdcr_el2(void)

@@ -46,7 +46,13 @@
 __asm__(".arch_extension	virt");
 #endif
 
-DEFINE_PER_CPU(kvm_host_data_t, kvm_host_data);
+DEFINE_PER_CPU(struct kvm_cpu_context, kvm_host_ctxt);
+DEFINE_PER_CPU(struct kvm_cpu_context, kvm_hyp_ctxt);
+DEFINE_PER_CPU(struct kvm_vcpu, kvm_host_vcpu);
+DEFINE_PER_CPU(struct kvm_pmu_events, kvm_pmu_events);
+DEFINE_PER_CPU(struct kvm_vcpu *, kvm_hyp_running_vcpu);
+DEFINE_PER_CPU(struct kvm_guest_debug_arch, kvm_host_debug_state);
+DEFINE_PER_CPU(u64, kvm_host_pmscr_el1);
 static DEFINE_PER_CPU(unsigned long, kvm_arm_hyp_stack_page);
 
 /* The VMID used in the VTTBR */
@@ -1256,10 +1262,14 @@ long kvm_arch_vm_ioctl(struct file *filp,
 
 static void cpu_init_hyp_mode(void)
 {
+	DECLARE_KVM_NVHE_SYM(__kvm_hyp_start);
+
 	phys_addr_t pgd_ptr;
 	unsigned long hyp_stack_ptr;
 	unsigned long vector_ptr;
+	unsigned long start_hyp;
 	unsigned long tpidr_el2;
+	struct arm_smccc_res res;
 
 	/* Switch from the HYP stub to our own HYP init vector */
 	__hyp_set_vectors(kvm_get_idmap_vector());
@@ -1269,12 +1279,14 @@ static void cpu_init_hyp_mode(void)
 	 * kernel's mapping to the linear mapping, and store it in tpidr_el2
 	 * so that we can use adr_l to access per-cpu variables in EL2.
 	 */
-	tpidr_el2 = ((unsigned long)this_cpu_ptr(&kvm_host_data) -
-		     (unsigned long)kvm_ksym_ref(&kvm_host_data));
+	tpidr_el2 = ((unsigned long)this_cpu_ptr(&kvm_hyp_running_vcpu) -
+		     (unsigned long)kvm_ksym_ref(&kvm_hyp_running_vcpu));
 
 	pgd_ptr = kvm_mmu_get_httbr();
 	hyp_stack_ptr = __this_cpu_read(kvm_arm_hyp_stack_page) + PAGE_SIZE;
+	hyp_stack_ptr = kern_hyp_va(hyp_stack_ptr);
 	vector_ptr = (unsigned long)kvm_get_hyp_vector();
+	start_hyp = (unsigned long)kern_hyp_va(kvm_ksym_ref_nvhe(__kvm_hyp_start));
 
 	/*
 	 * Call initialization code, and switch to the full blown HYP code.
@@ -1283,7 +1295,10 @@ static void cpu_init_hyp_mode(void)
 	 * cpus_have_const_cap() wrapper.
 	 */
 	BUG_ON(!system_capabilities_finalized());
-	__kvm_call_hyp((void *)pgd_ptr, hyp_stack_ptr, vector_ptr, tpidr_el2);
+	arm_smccc_1_1_hvc(KVM_HOST_SMCCC_FUNC(__kvm_hyp_init),
+			  pgd_ptr, tpidr_el2, start_hyp, hyp_stack_ptr,
+			  vector_ptr, &res);
+	WARN_ON(res.a0 != SMCCC_RET_SUCCESS);
 
 	/*
 	 * Disabling SSBD on a non-VHE system requires us to enable SSBS
@@ -1303,14 +1318,14 @@ static void cpu_hyp_reset(void)
 
 static void cpu_hyp_reinit(void)
 {
-	kvm_init_host_cpu_context(&this_cpu_ptr(&kvm_host_data)->host_ctxt);
-
 	cpu_hyp_reset();
 
-	if (is_kernel_in_hyp_mode())
+	if (is_kernel_in_hyp_mode()) {
+		kvm_init_host_cpu_context(this_cpu_ptr(&kvm_host_ctxt));
 		kvm_timer_init_vhe();
-	else
+	} else {
 		cpu_init_hyp_mode();
+	}
 
 	kvm_arm_init_debug();
 
@@ -1536,13 +1551,49 @@ static int init_hyp_mode(void)
 	}
 
 	for_each_possible_cpu(cpu) {
-		kvm_host_data_t *cpu_data;
+		struct kvm_cpu_context *hyp_ctxt;
+		struct kvm_vcpu *host_vcpu;
+		u64 *host_pmscr;
+		struct kvm_vcpu **running_vcpu;
+		struct kvm_pmu_events *pmu;
 
-		cpu_data = per_cpu_ptr(&kvm_host_data, cpu);
-		err = create_hyp_mappings(cpu_data, cpu_data + 1, PAGE_HYP);
+		hyp_ctxt = per_cpu_ptr(&kvm_hyp_ctxt, cpu);
+		err = create_hyp_mappings(hyp_ctxt, hyp_ctxt + 1, PAGE_HYP);
 
 		if (err) {
-			kvm_err("Cannot map host CPU state: %d\n", err);
+			kvm_err("Cannot map hyp CPU context: %d\n", err);
+			goto out_err;
+		}
+
+		host_vcpu = per_cpu_ptr(&kvm_host_vcpu, cpu);
+		err = create_hyp_mappings(host_vcpu, host_vcpu + 1, PAGE_HYP);
+
+		if (err) {
+			kvm_err("Cannot map host vCPU: %d\n", err);
+			goto out_err;
+		}
+
+		host_pmscr = per_cpu_ptr(&kvm_host_pmscr_el1, cpu);
+		err = create_hyp_mappings(host_pmscr, host_pmscr + 1, PAGE_HYP);
+
+		if (err) {
+			kvm_err("Cannot map host pmscr_el1: %d\n", err);
+			goto out_err;
+		}
+
+		running_vcpu = per_cpu_ptr(&kvm_hyp_running_vcpu, cpu);
+		err = create_hyp_mappings(running_vcpu, running_vcpu + 1, PAGE_HYP);
+
+		if (err) {
+			kvm_err("Cannot map running vCPU: %d\n", err);
+			goto out_err;
+		}
+
+		pmu = per_cpu_ptr(&kvm_pmu_events, cpu);
+		err = create_hyp_mappings(pmu, pmu + 1, PAGE_HYP);
+
+		if (err) {
+			kvm_err("Cannot map PMU events: %d\n", err);
 			goto out_err;
 		}
 	}

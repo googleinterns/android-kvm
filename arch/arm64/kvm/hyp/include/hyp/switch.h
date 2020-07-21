@@ -27,6 +27,8 @@
 #include <asm/processor.h>
 #include <asm/thread_info.h>
 
+DECLARE_PER_CPU(struct kvm_cpu_context, kvm_hyp_ctxt);
+
 extern const char __hyp_panic_string[];
 
 /* Check whether the FP regs were dirtied while in the host-side run loop: */
@@ -50,6 +52,9 @@ static inline bool update_fp_enabled(struct kvm_vcpu *vcpu)
 /* Save the 32-bit only FPSIMD system register state */
 static inline void __fpsimd_save_fpexc32(struct kvm_vcpu *vcpu)
 {
+	if (!(vcpu->arch.flags & KVM_ARM64_FP_ENABLED))
+		return;
+
 	if (!vcpu_el1_is_32bit(vcpu))
 		return;
 
@@ -108,7 +113,7 @@ static inline void ___activate_traps(struct kvm_vcpu *vcpu)
 		write_sysreg_s(vcpu->arch.vsesr_el2, SYS_VSESR_EL2);
 }
 
-static inline void ___deactivate_traps(struct kvm_vcpu *vcpu)
+static inline void __save_traps(struct kvm_vcpu *vcpu)
 {
 	/*
 	 * If we pended a virtual abort, preserve it until it gets
@@ -120,11 +125,6 @@ static inline void ___deactivate_traps(struct kvm_vcpu *vcpu)
 		vcpu->arch.hcr_el2 &= ~HCR_VSE;
 		vcpu->arch.hcr_el2 |= read_sysreg(hcr_el2) & HCR_VSE;
 	}
-}
-
-static inline void __activate_vm(struct kvm_s2_mmu *mmu)
-{
-	__load_guest_stage2(mmu);
 }
 
 static inline bool __translate_far_to_hpfar(u64 far, u64 *hpfar)
@@ -382,7 +382,7 @@ static inline bool __hyp_handle_ptrauth(struct kvm_vcpu *vcpu)
 	    !esr_is_ptrauth_trap(kvm_vcpu_get_esr(vcpu)))
 		return false;
 
-	ctxt = &__hyp_this_cpu_ptr(kvm_host_data)->host_ctxt;
+	ctxt = get_hyp_ctxt();
 	__ptrauth_save_key(ctxt, APIA);
 	__ptrauth_save_key(ctxt, APIB);
 	__ptrauth_save_key(ctxt, APDA);
@@ -405,6 +405,10 @@ static inline bool __hyp_handle_ptrauth(struct kvm_vcpu *vcpu)
  */
 static inline bool fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
 {
+	/* Flush guest SErrors but leave them pending for the host. */
+	if (ARM_SERROR_PENDING(*exit_code) && !vcpu->arch.ctxt.is_host)
+		__handle_sei();
+
 	if (ARM_EXCEPTION_CODE(*exit_code) != ARM_EXCEPTION_IRQ)
 		vcpu->arch.fault.esr_el2 = read_sysreg_el2(SYS_ESR);
 
@@ -480,15 +484,15 @@ static inline bool __needs_ssbd_off(struct kvm_vcpu *vcpu)
 	if (!cpus_have_final_cap(ARM64_SSBD))
 		return false;
 
-	return !(vcpu->arch.workaround_flags & VCPU_WORKAROUND_2_FLAG);
+	return !kvm_arm_get_vcpu_workaround_2_flag(vcpu);
 }
 
-static inline void __set_guest_arch_workaround_state(struct kvm_vcpu *vcpu)
+static inline void __set_vcpu_arch_workaround_state(struct kvm_vcpu *vcpu)
 {
 #ifdef CONFIG_ARM64_SSBD
 	/*
-	 * The host runs with the workaround always present. If the
-	 * guest wants it disabled, so be it...
+	 * The hyp runs with the workaround always present. If the
+	 * vpu wants it disabled, so be it...
 	 */
 	if (__needs_ssbd_off(vcpu) &&
 	    __hyp_this_cpu_read(arm64_ssbd_callback_required))
@@ -496,11 +500,11 @@ static inline void __set_guest_arch_workaround_state(struct kvm_vcpu *vcpu)
 #endif
 }
 
-static inline void __set_host_arch_workaround_state(struct kvm_vcpu *vcpu)
+static inline void __set_hyp_arch_workaround_state(struct kvm_vcpu *vcpu)
 {
 #ifdef CONFIG_ARM64_SSBD
 	/*
-	 * If the guest has disabled the workaround, bring it back on.
+	 * If the vcpu has disabled the workaround, bring it back on.
 	 */
 	if (__needs_ssbd_off(vcpu) &&
 	    __hyp_this_cpu_read(arm64_ssbd_callback_required))

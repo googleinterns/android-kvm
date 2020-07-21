@@ -81,6 +81,28 @@
 			   ARM_SMCCC_SMC_32,				\
 			   0, 0x7fff)
 
+/* Paravirtualised time calls (defined by ARM DEN0057A) */
+#define ARM_SMCCC_HV_PV_TIME_FEATURES				\
+	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,			\
+			   ARM_SMCCC_SMC_64,			\
+			   ARM_SMCCC_OWNER_STANDARD_HYP,	\
+			   0x20)
+
+#define ARM_SMCCC_HV_PV_TIME_ST					\
+	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,			\
+			   ARM_SMCCC_SMC_64,			\
+			   ARM_SMCCC_OWNER_STANDARD_HYP,	\
+			   0x21)
+
+/*
+ * Return codes defined in ARM DEN 0070A
+ * ARM DEN 0070A is now merged/consolidated into ARM DEN 0028 C
+ */
+#define SMCCC_RET_SUCCESS			0
+#define SMCCC_RET_NOT_SUPPORTED			-1
+#define SMCCC_RET_NOT_REQUIRED			-2
+#define SMCCC_RET_INVALID_PARAMETER		-3
+
 #ifndef __ASSEMBLY__
 
 #include <linux/linkage.h>
@@ -233,7 +255,7 @@ asmlinkage void __arm_smccc_hvc(unsigned long a0, unsigned long a1,
 	typeof(a1) __a1 = a1;						\
 	struct arm_smccc_res   *___res = res;				\
 	register unsigned long r0 asm("r0") = (u32)a0;			\
-	register unsigned long r1 asm("r1") = __a1;			\
+	register unsigned long r1 asm("r1") = (unsigned long)__a1;	\
 	register unsigned long r2 asm("r2");				\
 	register unsigned long r3 asm("r3")
 
@@ -242,8 +264,8 @@ asmlinkage void __arm_smccc_hvc(unsigned long a0, unsigned long a1,
 	typeof(a2) __a2 = a2;						\
 	struct arm_smccc_res   *___res = res;				\
 	register unsigned long r0 asm("r0") = (u32)a0;			\
-	register unsigned long r1 asm("r1") = __a1;			\
-	register unsigned long r2 asm("r2") = __a2;			\
+	register unsigned long r1 asm("r1") = (unsigned long)__a1;	\
+	register unsigned long r2 asm("r2") = (unsigned long)__a2;	\
 	register unsigned long r3 asm("r3")
 
 #define __declare_arg_3(a0, a1, a2, a3, res)				\
@@ -252,29 +274,29 @@ asmlinkage void __arm_smccc_hvc(unsigned long a0, unsigned long a1,
 	typeof(a3) __a3 = a3;						\
 	struct arm_smccc_res   *___res = res;				\
 	register unsigned long r0 asm("r0") = (u32)a0;			\
-	register unsigned long r1 asm("r1") = __a1;			\
-	register unsigned long r2 asm("r2") = __a2;			\
-	register unsigned long r3 asm("r3") = __a3
+	register unsigned long r1 asm("r1") = (unsigned long)__a1;	\
+	register unsigned long r2 asm("r2") = (unsigned long)__a2;	\
+	register unsigned long r3 asm("r3") = (unsigned long)__a3
 
 #define __declare_arg_4(a0, a1, a2, a3, a4, res)			\
 	typeof(a4) __a4 = a4;						\
 	__declare_arg_3(a0, a1, a2, a3, res);				\
-	register unsigned long r4 asm("r4") = __a4
+	register unsigned long r4 asm("r4") = (unsigned long)__a4
 
 #define __declare_arg_5(a0, a1, a2, a3, a4, a5, res)			\
 	typeof(a5) __a5 = a5;						\
 	__declare_arg_4(a0, a1, a2, a3, a4, res);			\
-	register unsigned long r5 asm("r5") = __a5
+	register unsigned long r5 asm("r5") = (unsigned long)__a5
 
 #define __declare_arg_6(a0, a1, a2, a3, a4, a5, a6, res)		\
 	typeof(a6) __a6 = a6;						\
 	__declare_arg_5(a0, a1, a2, a3, a4, a5, res);			\
-	register unsigned long r6 asm("r6") = __a6
+	register unsigned long r6 asm("r6") = (unsigned long)__a6
 
 #define __declare_arg_7(a0, a1, a2, a3, a4, a5, a6, a7, res)		\
 	typeof(a7) __a7 = a7;						\
 	__declare_arg_6(a0, a1, a2, a3, a4, a5, a6, res);		\
-	register unsigned long r7 asm("r7") = __a7
+	register unsigned long r7 asm("r7") = (unsigned long)__a7
 
 #define ___declare_args(count, ...) __declare_arg_ ## count(__VA_ARGS__)
 #define __declare_args(count, ...)  ___declare_args(count, __VA_ARGS__)
@@ -332,15 +354,6 @@ asmlinkage void __arm_smccc_hvc(unsigned long a0, unsigned long a1,
 #define arm_smccc_1_1_hvc(...)	__arm_smccc_1_1(SMCCC_HVC_INST, __VA_ARGS__)
 
 /*
- * Return codes defined in ARM DEN 0070A
- * ARM DEN 0070A is now merged/consolidated into ARM DEN 0028 C
- */
-#define SMCCC_RET_SUCCESS			0
-#define SMCCC_RET_NOT_SUPPORTED			-1
-#define SMCCC_RET_NOT_REQUIRED			-2
-#define SMCCC_RET_INVALID_PARAMETER		-3
-
-/*
  * Like arm_smccc_1_1* but always returns SMCCC_RET_NOT_SUPPORTED.
  * Used when the SMCCC conduit is not defined. The empty asm statement
  * avoids compiler warnings about unused variables.
@@ -384,19 +397,6 @@ asmlinkage void __arm_smccc_hvc(unsigned long a0, unsigned long a1,
 		}							\
 		method;							\
 	})
-
-/* Paravirtualised time calls (defined by ARM DEN0057A) */
-#define ARM_SMCCC_HV_PV_TIME_FEATURES				\
-	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,			\
-			   ARM_SMCCC_SMC_64,			\
-			   ARM_SMCCC_OWNER_STANDARD_HYP,	\
-			   0x20)
-
-#define ARM_SMCCC_HV_PV_TIME_ST					\
-	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,			\
-			   ARM_SMCCC_SMC_64,			\
-			   ARM_SMCCC_OWNER_STANDARD_HYP,	\
-			   0x21)
 
 #endif /*__ASSEMBLY__*/
 #endif /*__LINUX_ARM_SMCCC_H*/

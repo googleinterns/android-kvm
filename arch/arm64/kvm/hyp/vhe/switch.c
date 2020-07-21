@@ -67,7 +67,7 @@ static void __deactivate_traps(struct kvm_vcpu *vcpu)
 {
 	extern char vectors[];	/* kernel exception vectors */
 
-	___deactivate_traps(vcpu);
+	__save_traps(vcpu);
 
 	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
 
@@ -108,8 +108,8 @@ static int __kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
 	struct kvm_cpu_context *guest_ctxt;
 	u64 exit_code;
 
-	host_ctxt = &__hyp_this_cpu_ptr(kvm_host_data)->host_ctxt;
-	host_ctxt->__hyp_running_vcpu = vcpu;
+	host_ctxt = __hyp_this_cpu_ptr(kvm_host_ctxt);
+	*__hyp_this_cpu_ptr(kvm_hyp_running_vcpu) = vcpu;
 	guest_ctxt = &vcpu->arch.ctxt;
 
 	sysreg_save_host_state_vhe(host_ctxt);
@@ -120,18 +120,19 @@ static int __kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
 	 * HCR_EL2.TGE.
 	 *
 	 * We have already configured the guest's stage 1 translation in
-	 * kvm_vcpu_load_sysregs_vhe above.  We must now call __activate_vm
-	 * before __activate_traps, because __activate_vm configures
-	 * stage 2 translation, and __activate_traps clear HCR_EL2.TGE
-	 * (among other things).
+	 * kvm_vcpu_load_sysregs_vhe above.  We must now call
+	 * __load_guest_stage2 before __activate_traps, because
+	 * __load_guest_stage2 configures stage 2 translation, and
+	 * __activate_traps clear HCR_EL2.TGE (among other things).
 	 */
-	__activate_vm(vcpu->arch.hw_mmu);
+	__load_guest_stage2(vcpu->arch.hw_mmu);
+	asm(ALTERNATIVE("nop", "isb", ARM64_WORKAROUND_SPECULATIVE_AT));
 	__activate_traps(vcpu);
 
 	sysreg_restore_guest_state_vhe(guest_ctxt);
 	__debug_switch_to_guest(vcpu);
 
-	__set_guest_arch_workaround_state(vcpu);
+	__set_vcpu_arch_workaround_state(vcpu);
 
 	do {
 		/* Jump in the fire! */
@@ -140,7 +141,7 @@ static int __kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
 		/* And we're baaack! */
 	} while (fixup_guest_exit(vcpu, &exit_code));
 
-	__set_host_arch_workaround_state(vcpu);
+	__set_hyp_arch_workaround_state(vcpu);
 
 	sysreg_save_guest_state_vhe(guest_ctxt);
 
@@ -148,8 +149,7 @@ static int __kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
 
 	sysreg_restore_host_state_vhe(host_ctxt);
 
-	if (vcpu->arch.flags & KVM_ARM64_FP_ENABLED)
-		__fpsimd_save_fpexc32(vcpu);
+	__fpsimd_save_fpexc32(vcpu);
 
 	__debug_switch_to_host(vcpu);
 
@@ -195,8 +195,7 @@ int __kvm_vcpu_run(struct kvm_vcpu *vcpu)
 static void __hyp_call_panic(u64 spsr, u64 elr, u64 par,
 			     struct kvm_cpu_context *host_ctxt)
 {
-	struct kvm_vcpu *vcpu;
-	vcpu = host_ctxt->__hyp_running_vcpu;
+	struct kvm_vcpu *vcpu = __hyp_this_cpu_read(kvm_hyp_running_vcpu);
 
 	__deactivate_traps(vcpu);
 	sysreg_restore_host_state_vhe(host_ctxt);
@@ -208,8 +207,9 @@ static void __hyp_call_panic(u64 spsr, u64 elr, u64 par,
 }
 NOKPROBE_SYMBOL(__hyp_call_panic);
 
-void __noreturn hyp_panic(struct kvm_cpu_context *host_ctxt)
+void __noreturn hyp_panic(void)
 {
+	struct kvm_cpu_context *host_ctxt = __hyp_this_cpu_ptr(kvm_host_ctxt);
 	u64 spsr = read_sysreg_el2(SYS_SPSR);
 	u64 elr = read_sysreg_el2(SYS_ELR);
 	u64 par = read_sysreg(par_el1);

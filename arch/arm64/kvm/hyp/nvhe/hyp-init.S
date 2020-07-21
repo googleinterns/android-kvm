@@ -4,14 +4,19 @@
  * Author: Marc Zyngier <marc.zyngier@arm.com>
  */
 
+#include <linux/arm-smccc.h>
 #include <linux/linkage.h>
 
 #include <asm/assembler.h>
 #include <asm/kvm_arm.h>
+#include <asm/kvm_asm.h>
 #include <asm/kvm_mmu.h>
 #include <asm/pgtable-hwdef.h>
 #include <asm/sysreg.h>
 #include <asm/virt.h>
+
+#include <asm/kvm_asm.h>
+#include <asm/kvm_ptrauth.h>
 
 	.text
 	.pushsection	.hyp.idmap.text, "ax"
@@ -43,27 +48,38 @@ __invalid:
 	b	.
 
 	/*
-	 * x0: HYP pgd
-	 * x1: HYP stack
-	 * x2: HYP vectors
-	 * x3: per-CPU offset
+	 * x0: SMCCC function ID
+	 * x1: HYP pgd
+	 * x2: per-CPU offset
+	 * x3: __kvm_hyp_start HYP address
+	 * x4: HYP stack
+	 * x5: HYP vectors
 	 */
 __do_hyp_init:
 	/* Check for a stub HVC call */
 	cmp	x0, #HVC_STUB_HCALL_NR
 	b.lo	__kvm_handle_stub_hvc
 
-	phys_to_ttbr x4, x0
-alternative_if ARM64_HAS_CNP
-	orr	x4, x4, #TTBR_CNP_BIT
-alternative_else_nop_endif
-	msr	ttbr0_el2, x4
+	/* Set tpidr_el2 for use by HYP to free a register */
+	msr	tpidr_el2, x2
 
-	mrs	x4, tcr_el1
-	mov_q	x5, TCR_EL2_MASK
-	and	x4, x4, x5
-	mov	x5, #TCR_EL2_RES1
-	orr	x4, x4, x5
+	mov	x2, #KVM_HOST_SMCCC_FUNC(__kvm_hyp_init)
+	cmp	x0, x2
+	b.eq	1f
+	mov	x0, #SMCCC_RET_NOT_SUPPORTED
+	eret
+
+1:	phys_to_ttbr x0, x1
+alternative_if ARM64_HAS_CNP
+	orr	x0, x0, #TTBR_CNP_BIT
+alternative_else_nop_endif
+	msr	ttbr0_el2, x0
+
+	mrs	x0, tcr_el1
+	mov_q	x1, TCR_EL2_MASK
+	and	x0, x0, x1
+	mov	x1, #TCR_EL2_RES1
+	orr	x0, x0, x1
 
 	/*
 	 * The ID map may be configured to use an extended virtual address
@@ -79,18 +95,18 @@ alternative_else_nop_endif
 	 *
 	 * So use the same T0SZ value we use for the ID map.
 	 */
-	ldr_l	x5, idmap_t0sz
-	bfi	x4, x5, TCR_T0SZ_OFFSET, TCR_TxSZ_WIDTH
+	ldr_l	x1, idmap_t0sz
+	bfi	x0, x1, TCR_T0SZ_OFFSET, TCR_TxSZ_WIDTH
 
 	/*
 	 * Set the PS bits in TCR_EL2.
 	 */
-	tcr_compute_pa_size x4, #TCR_EL2_PS_SHIFT, x5, x6
+	tcr_compute_pa_size x0, #TCR_EL2_PS_SHIFT, x1, x2
 
-	msr	tcr_el2, x4
+	msr	tcr_el2, x0
 
-	mrs	x4, mair_el1
-	msr	mair_el2, x4
+	mrs	x0, mair_el1
+	msr	mair_el2, x0
 	isb
 
 	/* Invalidate the stale TLBs from Bootloader */
@@ -102,32 +118,29 @@ alternative_else_nop_endif
 	 * as well as the EE bit on BE. Drop the A flag since the compiler
 	 * is allowed to generate unaligned accesses.
 	 */
-	mov_q	x4, (SCTLR_EL2_RES1 | (SCTLR_ELx_FLAGS & ~SCTLR_ELx_A))
-CPU_BE(	orr	x4, x4, #SCTLR_ELx_EE)
+	mov_q	x0, (SCTLR_EL2_RES1 | (SCTLR_ELx_FLAGS & ~SCTLR_ELx_A))
+CPU_BE(	orr	x0, x0, #SCTLR_ELx_EE)
 alternative_if ARM64_HAS_ADDRESS_AUTH
-	mov_q	x5, (SCTLR_ELx_ENIA | SCTLR_ELx_ENIB | \
+	mov_q	x1, (SCTLR_ELx_ENIA | SCTLR_ELx_ENIB | \
 		     SCTLR_ELx_ENDA | SCTLR_ELx_ENDB)
-	orr	x4, x4, x5
+	orr	x0, x0, x1
 alternative_else_nop_endif
-	msr	sctlr_el2, x4
+	msr	sctlr_el2, x0
 	isb
 
 	/* Set the stack and new vectors */
-	kern_hyp_va	x1
-	mov	sp, x1
-	msr	vbar_el2, x2
+	mov	sp, x4
+	msr	vbar_el2, x5
 
-	/* Set tpidr_el2 for use by HYP */
-	msr	tpidr_el2, x3
-
-	/* Hello, World! */
-	eret
+	/* Leave the idmap posthaste and head over to __kvm_hyp_start */
+	br	x3
 SYM_CODE_END(__kvm_hyp_init)
 
 SYM_CODE_START(__kvm_handle_stub_hvc)
 	cmp	x0, #HVC_SOFT_RESTART
 	b.ne	1f
 
+SYM_INNER_LABEL(__kvm_handle_stub_hvc_soft_restart, SYM_L_GLOBAL)
 	/* This is where we're about to jump, staying at EL2 */
 	msr	elr_el2, x1
 	mov	x0, #(PSR_F_BIT | PSR_I_BIT | PSR_A_BIT | PSR_D_BIT | PSR_MODE_EL2h)
@@ -137,11 +150,18 @@ SYM_CODE_START(__kvm_handle_stub_hvc)
 	mov	x0, x2
 	mov	x1, x3
 	mov	x2, x4
-	b	reset
+	b	2f
 
 1:	cmp	x0, #HVC_RESET_VECTORS
 	b.ne	1f
 
+SYM_INNER_LABEL(__kvm_handle_stub_hvc_reset_vectors, SYM_L_GLOBAL)
+	/* Restore host's ptrauth, sp_el0 and callee saved regs */
+	ptrauth_switch_to_guest x5, x6, x7, x8
+	restore_sp_el0 x5, x6
+	restore_callee_saved_regs x5
+
+2:
 	/*
 	 * Set the HVC_RESET_VECTORS return code before entering the common
 	 * path so that we do not clobber x0-x2 in case we are coming via
