@@ -9,6 +9,7 @@
 #include <asm/fpsimdmacros.h>
 
 	.text
+	.pushsection	.hyp.text, "ax"
 
 SYM_FUNC_START(__fpsimd_save_state)
 	fpsimd_save	x0, 1
