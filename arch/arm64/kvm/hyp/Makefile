@@ -3,14 +3,10 @@
 # Makefile for Kernel-based Virtual Machine module, HYP part
 #
 
-incdir := $(srctree)/$(src)/include
-subdir-asflags-y := -I$(incdir)
-subdir-ccflags-y := -I$(incdir)				\
-		    -fno-stack-protector		\
-		    -DDISABLE_BRANCH_PROFILING		\
-		    $(DISABLE_STACKLEAK_PLUGIN)
+ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING \
+		$(DISABLE_STACKLEAK_PLUGIN)
 
-obj-$(CONFIG_KVM) += hyp.o nvhe/
+obj-$(CONFIG_KVM) += hyp.o
 obj-$(CONFIG_KVM_INDIRECT_VECTORS) += smccc_wa.o
 
 hyp-y := vgic-v3-sr.o timer-sr.o aarch32.o vgic-v2-cpuif-proxy.o sysreg-sr.o \
