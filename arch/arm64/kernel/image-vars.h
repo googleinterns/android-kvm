@@ -81,6 +81,12 @@ KVM_NVHE_ALIAS(__kvm_enable_ssbs);
 /* Symbols defined in timer-sr.c (not yet compiled with nVHE build rules). */
 KVM_NVHE_ALIAS(__kvm_timer_set_cntvoff);
 
+/* Symbols defined in tlb.c (not yet compiled with nVHE build rules). */
+KVM_NVHE_ALIAS(__kvm_flush_vm_context);
+KVM_NVHE_ALIAS(__kvm_tlb_flush_local_vmid);
+KVM_NVHE_ALIAS(__kvm_tlb_flush_vmid);
+KVM_NVHE_ALIAS(__kvm_tlb_flush_vmid_ipa);
+
 /* Symbols defined in vgic-v3-sr.c (not yet compiled with nVHE build rules). */
 KVM_NVHE_ALIAS(__vgic_v3_get_ich_vtr_el2);
 KVM_NVHE_ALIAS(__vgic_v3_init_lrs);
@@ -106,14 +112,6 @@ KVM_NVHE_ALIAS(panic);
 
 /* Vectors installed by hyp-init on reset HVC. */
 KVM_NVHE_ALIAS(__hyp_stub_vectors);
-
-/* Kernel symbol used by icache_is_vpipt(). */
-KVM_NVHE_ALIAS(__icache_flags);
-
-/* Kernel symbols needed for cpus_have_final/const_caps checks. */
-KVM_NVHE_ALIAS(arm64_const_caps_ready);
-KVM_NVHE_ALIAS(cpu_hwcap_keys);
-KVM_NVHE_ALIAS(cpu_hwcaps);
 
 #endif /* CONFIG_KVM */
 
