@@ -748,7 +748,11 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu)
 		trace_kvm_entry(*vcpu_pc(vcpu));
 		guest_enter_irqoff();
 
-		ret = kvm_call_hyp_ret(__kvm_vcpu_run, vcpu);
+		if (has_vhe()) {
+			ret = kvm_vcpu_run_vhe(vcpu);
+		} else {
+			ret = kvm_call_hyp_ret(__kvm_vcpu_run_nvhe, vcpu);
+		}
 
 		vcpu->mode = OUTSIDE_GUEST_MODE;
 		vcpu->stat.exits++;

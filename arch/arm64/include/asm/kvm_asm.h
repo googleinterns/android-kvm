@@ -96,7 +96,9 @@ extern void __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu);
 
 extern void __kvm_timer_set_cntvoff(u64 cntvoff);
 
-extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+extern int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu);
+
+extern int __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu);
 
 extern void __kvm_enable_ssbs(void);
 
