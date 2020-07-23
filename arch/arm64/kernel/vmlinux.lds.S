@@ -16,6 +16,9 @@
 
 #include "image.h"
 
+#define __CONCAT3(x, y, z) x ## y ## z
+#define CONCAT3(x, y, z) __CONCAT3(x, y, z)
+
 OUTPUT_ARCH(aarch64)
 ENTRY(_text)
 
@@ -182,6 +185,13 @@ SECTIONS
 		EXIT_DATA
 	}
 
+	PERCPU_SECTION(L1_CACHE_BYTES)
+
+	/* KVM nVHE per-cpu section */
+	#undef PERCPU_SECTION_NAME
+	#undef PERCPU_SYMBOL_NAME
+	#define PERCPU_SECTION_NAME(suffix)	CONCAT3(.hyp, PERCPU_SECTION_BASE_NAME, suffix)
+	#define PERCPU_SYMBOL_NAME(name)	__kvm_nvhe_ ## name
 	PERCPU_SECTION(L1_CACHE_BYTES)
 
 	.rela.dyn : ALIGN(8) {

@@ -14,6 +14,8 @@
 #include <asm/kvm_hyp.h>
 #include <asm/kvm_mmu.h>
 
+DEFINE_PER_CPU(u64, kvm_host_pmscr_el1);
+
 void __debug_save_spe(struct kvm_vcpu *vcpu)
 {
 	u64 reg;
@@ -23,7 +25,7 @@ void __debug_save_spe(struct kvm_vcpu *vcpu)
 		return;
 
 	/* Clear pmscr in case of early return */
-	pmscr_el1 = __hyp_this_cpu_ptr(kvm_host_pmscr_el1);
+	pmscr_el1 = this_cpu_ptr(&kvm_host_pmscr_el1);
 	*pmscr_el1 = 0;
 
 	/* SPE present on this CPU? */
@@ -58,7 +60,7 @@ void __debug_restore_spe(struct kvm_vcpu *vcpu)
 	if (!vcpu->arch.ctxt.is_host)
 		return;
 
-	pmscr_el1 = __hyp_this_cpu_read(kvm_host_pmscr_el1);
+	pmscr_el1 = __this_cpu_read(kvm_host_pmscr_el1);
 	if (!pmscr_el1)
 		return;
 

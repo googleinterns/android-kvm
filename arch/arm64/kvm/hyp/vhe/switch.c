@@ -26,6 +26,9 @@
 #include <asm/processor.h>
 #include <asm/thread_info.h>
 
+DEFINE_PER_CPU(struct kvm_vcpu *, kvm_hyp_running_vcpu);
+DEFINE_PER_CPU(struct kvm_pmu_events, kvm_pmu_events);
+
 const char __hyp_panic_string[] = "HYP panic:\nPS:%08llx PC:%016llx ESR:%08llx\nFAR:%016llx HPFAR:%016llx PAR:%016llx\nVCPU:%p\n";
 
 static void __activate_traps(struct kvm_vcpu *vcpu)
@@ -108,8 +111,8 @@ static int __kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
 	struct kvm_cpu_context *guest_ctxt;
 	u64 exit_code;
 
-	host_ctxt = __hyp_this_cpu_ptr(kvm_host_ctxt);
-	*__hyp_this_cpu_ptr(kvm_hyp_running_vcpu) = vcpu;
+	host_ctxt = this_cpu_ptr(&kvm_host_ctxt);
+	*this_cpu_ptr(&kvm_hyp_running_vcpu) = vcpu;
 	guest_ctxt = &vcpu->arch.ctxt;
 
 	sysreg_save_host_state_vhe(host_ctxt);
@@ -195,7 +198,7 @@ int __kvm_vcpu_run(struct kvm_vcpu *vcpu)
 static void __hyp_call_panic(u64 spsr, u64 elr, u64 par,
 			     struct kvm_cpu_context *host_ctxt)
 {
-	struct kvm_vcpu *vcpu = __hyp_this_cpu_read(kvm_hyp_running_vcpu);
+	struct kvm_vcpu *vcpu = __this_cpu_read(kvm_hyp_running_vcpu);
 
 	__deactivate_traps(vcpu);
 	sysreg_restore_host_state_vhe(host_ctxt);
@@ -209,7 +212,7 @@ NOKPROBE_SYMBOL(__hyp_call_panic);
 
 void __noreturn hyp_panic(void)
 {
-	struct kvm_cpu_context *host_ctxt = __hyp_this_cpu_ptr(kvm_host_ctxt);
+	struct kvm_cpu_context *host_ctxt = this_cpu_ptr(&kvm_host_ctxt);
 	u64 spsr = read_sysreg_el2(SYS_SPSR);
 	u64 elr = read_sysreg_el2(SYS_ELR);
 	u64 par = read_sysreg(par_el1);

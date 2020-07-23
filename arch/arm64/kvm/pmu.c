@@ -7,6 +7,8 @@
 #include <linux/perf_event.h>
 #include <asm/kvm_hyp.h>
 
+DECLARE_KVM_HYP_PER_CPU(struct kvm_pmu_events, kvm_pmu_events);
+
 /*
  * Given the perf event attributes and system type, determine
  * if we are going to need to switch counters at guest entry/exit.
@@ -31,9 +33,9 @@ static bool kvm_pmu_switch_needed(struct perf_event_attr *attr)
  */
 void kvm_set_pmu_events(u32 set, struct perf_event_attr *attr)
 {
-	struct kvm_pmu_events *pmu = this_cpu_ptr(&kvm_pmu_events);
+	struct kvm_pmu_events *pmu = this_cpu_ptr_hyp(kvm_pmu_events);
 
-	if (!kvm_pmu_switch_needed(attr))
+	if (!pmu || !kvm_pmu_switch_needed(attr))
 		return;
 
 	if (!attr->exclude_host)
@@ -47,7 +49,10 @@ void kvm_set_pmu_events(u32 set, struct perf_event_attr *attr)
  */
 void kvm_clr_pmu_events(u32 clr)
 {
-	struct kvm_pmu_events *pmu = this_cpu_ptr(&kvm_pmu_events);
+	struct kvm_pmu_events *pmu = this_cpu_ptr_hyp(kvm_pmu_events);
+
+	if (!pmu)
+		return;
 
 	pmu->events_host &= ~clr;
 	pmu->events_guest &= ~clr;
