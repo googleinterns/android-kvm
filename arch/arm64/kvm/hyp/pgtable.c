@@ -439,18 +439,6 @@ struct stage2_map_data {
 	struct kvm_mmu_memory_cache	*memcache;
 };
 
-static kvm_pte_t *stage2_memcache_alloc_page(struct stage2_map_data *data)
-{
-	kvm_pte_t *ptep = NULL;
-	struct kvm_mmu_memory_cache *mc = data->memcache;
-
-	/* Allocated with GFP_PGTABLE_USER, so no need to zero */
-	if (mc && mc->nobjs)
-		ptep = mc->objects[--mc->nobjs];
-
-	return ptep;
-}
-
 static int stage2_map_set_prot_attr(enum kvm_pgtable_prot prot,
 				    struct stage2_map_data *data)
 {
@@ -531,7 +519,7 @@ static int stage2_map_walk_leaf(u64 addr, u64 end, u32 level, kvm_pte_t *ptep,
 	if (WARN_ON(level == KVM_PGTABLE_MAX_LEVELS - 1))
 		return -EINVAL;
 
-	childp = stage2_memcache_alloc_page(data);
+	childp = kvm_mmu_memory_cache_alloc(data->memcache);
 	if (!childp)
 		return -ENOMEM;
 
