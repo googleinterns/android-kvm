@@ -101,6 +101,10 @@ KVM_NVHE_ALIAS(vgic_v3_cpuif_trap);
 KVM_NVHE_ALIAS(gic_pmr_sync);
 #endif
 
+#ifdef CONFIG_KVM_ARM_HYP_DEBUG_UART
+KVM_NVHE_ALIAS(kvm_hyp_debug_uart_set_basep);
+#endif
+
 #endif /* CONFIG_KVM */
 
 #endif /* __ARM64_KERNEL_IMAGE_VARS_H */
