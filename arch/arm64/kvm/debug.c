@@ -245,4 +245,3 @@ void __kvm_arm_check_debug_buffer() {
 	}
 }
 #endif
-
