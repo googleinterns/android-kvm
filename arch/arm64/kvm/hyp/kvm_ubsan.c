@@ -143,7 +143,21 @@ EXPORT_SYMBOL(__ubsan_handle_builtin_unreachable);
 
 void __ubsan_handle_load_invalid_value(void *_data, void *val)
 {
+	struct invalid_value_data *data = _data;
+	struct kvm_debug_info *crt;
+    struct invalid_value_data *aux_cont;
+    unsigned int wr_index = __this_cpu_read(kvm_buff_write_ind);
 
+    if (wr_index < NMAX) {
+        crt = this_cpu_ptr(&kvm_debug_buff[wr_index]);
+        aux_cont = &crt->invld_val_data;
+        crt->type = UBSAN_INVALID_DATA;
+        copy_source_location_struct(&aux_cont->location, &data->location);
+        copy_type_descriptor(&aux_cont->type, &data->type);
+        crt->u_val.lval = val;
+        ++wr_index;
+        __this_cpu_write(kvm_buff_write_ind, wr_index);
+    }
 }
 EXPORT_SYMBOL(__ubsan_handle_load_invalid_value);
 #endif
