@@ -210,12 +210,13 @@ static void __vcpu_restore_state(struct kvm_vcpu *vcpu, bool restore_debug)
 }
 
 /* Switch to the guest for legacy non-VHE systems */
-int __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+int __kvm_vcpu_run(struct kvm_vcpu *vcpu)\
 {
+
 	struct kvm_cpu_context *hyp_ctxt;
 	struct kvm_vcpu *running_vcpu;
 	u64 exit_code;
-
+	
 	hyp_ctxt = this_cpu_ptr(&kvm_hyp_ctxt);
 	running_vcpu = __this_cpu_read(kvm_hyp_running_vcpu);
 

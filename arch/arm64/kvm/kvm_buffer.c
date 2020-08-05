@@ -44,6 +44,18 @@ struct kvm_debug_info {
 DECLARE_KVM_NVHE_PER_CPU(struct kvm_debug_info, kvm_debug_buff)[NMAX];
 DECLARE_KVM_NVHE_PER_CPU(unsigned int, kvm_buff_write_ind);
 
+#ifndef CONFIG_UBSAN_TRAP
+void __kvm_check_ubsan_data(struct kvm_debug_info *crt)
+{
+    switch (crt->type) {
+            case UBSAN_OO_BOUNDS:
+                __ubsan_handle_out_of_bounds(&crt->oo_bounds_data, crt->u_val.lval);
+                break;
+            default:
+                break;
+        }
+}
+#endif
 
 void __kvm_check_buffer(void)
 {
@@ -56,7 +68,7 @@ void __kvm_check_buffer(void)
         if (crt->type != 0) {
             if (crt->type <= UBSAN_MAX_TYPE) {
                 #ifndef CONFIG_UBSAN_TRAP
-                    /*parse logs from UBSAN*/
+                    __kvm_check_ubsan_data(crt);
                 #endif
             }
         }

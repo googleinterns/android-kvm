@@ -10,6 +10,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU General Public License for more details.
  */
 #define UBSAN_MAX_TYPE 6
+#define UBSAN_OO_BOUNDS 1
 
 #ifndef _LIB_UBSAN_H
 #define _LIB_UBSAN_H
@@ -90,6 +91,8 @@ struct invalid_value_data {
 	struct source_location location;
 	struct type_descriptor *type;
 };
+
+void __ubsan_handle_out_of_bounds(void *_data, void *index);
 
 #if defined(CONFIG_ARCH_SUPPORTS_INT128)
 typedef __int128 s_max;
