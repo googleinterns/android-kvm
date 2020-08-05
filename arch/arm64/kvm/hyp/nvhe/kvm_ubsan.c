@@ -32,18 +32,62 @@ void write_type_mismatch_data(struct type_mismatch_data_common *data, void *lval
     }
 }
 
+void write_overflow_data(struct overflow_data *data, void *lval, void *rval, char op)
+{
+    struct kvm_debug_info *crt;
+    struct overflow_data *aux_cont;
+    unsigned int wr_index = __this_cpu_read(kvm_buff_write_ind);
+	
+    if (wr_index < NMAX) {
+        crt = this_cpu_ptr(&kvm_debug_buffer[wr_index]);
+        aux_cont = &crt->ovfw_data;
+        crt->type = UBSAN_OVFW_DATA;
+        aux_cont->location.file_name = data->location.file_name;
+        aux_cont->location.reported = data->location.reported;
+        aux_cont->type = data->type;
+        crt->u_val.op = op;
+        crt->u_val.lval = lval;
+        if (op != '!') {
+            crt->u_val.rval = rval;
+        }
+        ++wr_index;
+        __this_cpu_write(kvm_buff_write_ind, wr_index);
+    }
+}
+
 void __ubsan_handle_add_overflow(void *_data,
-				void *lhs, void *rhs){}
+				void *lhs, void *rhs)
+{
+	struct overflow_data *data = _data;
+	write_overflow_data(data, lhs, rhs, '+');
+
+}
 
 void __ubsan_handle_sub_overflow(void *_data,
-				void *lhs, void *rhs){}
+				void *lhs, void *rhs)
+{
+	struct overflow_data *data = _data;
+	write_overflow_data(data, lhs, rhs, '-');
+}
 
 void __ubsan_handle_mul_overflow(void *_data,
-				void *lhs, void *rhs){}
+				void *lhs, void *rhs)
+{
+	struct overflow_data *data = _data;
+	write_overflow_data(data, lhs, rhs, '*');
+}
 
-void __ubsan_handle_negate_overflow(void *_data, void *old_val){}
+void __ubsan_handle_negate_overflow(void *_data, void *old_val)
+{
+	struct overflow_data *data = _data;
+	write_overflow_data(data, old_val, NULL, '!');
+}
 
-void __ubsan_handle_divrem_overflow(void *_data, void *lhs, void *rhs){}
+void __ubsan_handle_divrem_overflow(void *_data, void *lhs, void *rhs)
+{
+	struct overflow_data *data = _data;
+	write_overflow_data(data, lhs, rhs, '/');
+}
 
 void __ubsan_handle_type_mismatch(struct type_mismatch_data *data,
 				void *ptr)

@@ -18,6 +18,7 @@
 #define UBSAN_UNREACH_DATA 3
 #define UBSAN_INVALID_DATA 4
 #define UBSAN_MISM_DATA 5
+#define UBSAN_OVFW_DATA 6
 
 struct ubsan_values {
     void *lval;
@@ -48,11 +49,13 @@ struct kvm_debug_info {
     DECLARE_KVM_NVHE_PER_CPU(unsigned int, kvm_buff_write_ind);
 #endif   
 
+void __ubsan_handle_add_overflow(void *data, void *lhs, void *rhs);
+void __ubsan_handle_sub_overflow(void *data, void *lhs, void *rhs);
+void __ubsan_handle_mul_overflow(void *data, void *lhs, void *rhs);
+void __ubsan_handle_negate_overflow(void *_data, void *old_val);
+void __ubsan_handle_divrem_overflow(void *_data, void *lhs, void *rhs);
 void __ubsan_handle_out_of_bounds(void *_data, void *index);
 void __ubsan_handle_builtin_unreachable(void *_data);
 void __ubsan_handle_shift_out_of_bounds(void *_data, void *lhs, void *rhs);
 void __ubsan_handle_load_invalid_value(void *_data, void *val);
-<<<<<<< HEAD
-=======
 void __ubsan_handle_type_mismatch(struct type_mismatch_data  *_data, void *ptr);
->>>>>>> ad2e66d1d12e... An implementation for _ubsan_handle_type_mismatch

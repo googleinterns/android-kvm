@@ -32,6 +32,19 @@ void __kvm_check_ubsan_data(struct kvm_debug_info *crt)
             case UBSAN_MISM_DATA:
                 __ubsan_handle_type_mismatch(&crt->mism_data, crt->u_val.lval);
                 break;
+            case UBSAN_OVFW_DATA:
+                if (crt->u_val.op == '/') {
+                    __ubsan_handle_divrem_overflow(&crt->ovfw_data, crt->u_val.lval, crt->u_val.rval);
+                } else if (crt->u_val.op == '!') {
+                    __ubsan_handle_negate_overflow(&crt->ovfw_data, crt->u_val.lval);
+                } else if (crt->u_val.op == '+'){
+                    __ubsan_handle_add_overflow(&crt->ovfw_data, crt->u_val.lval, crt->u_val.rval);
+                } else if (crt->u_val.op == '-') {
+                    __ubsan_handle_sub_overflow(&crt->ovfw_data, crt->u_val.lval, crt->u_val.rval);
+                } else if (crt->u_val.op == '*') {
+                    __ubsan_handle_mul_overflow(&crt->ovfw_data, crt->u_val.lval, crt->u_val.rval);
+                }
+                break;
     }
 }
 #endif
