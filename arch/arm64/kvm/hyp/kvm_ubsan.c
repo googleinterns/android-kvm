@@ -40,12 +40,52 @@ void copy_type_descriptor(struct type_descriptor **dst,
    *dst = *src;
 }
 
+void __ubsan_handle_add_overflow(void *_data,
+				void *lhs, void *rhs)
+{
+}
+EXPORT_SYMBOL(__ubsan_handle_add_overflow);
+
+void __ubsan_handle_sub_overflow(void *_data,
+				void *lhs, void *rhs)
+{
+}
+EXPORT_SYMBOL(__ubsan_handle_sub_overflow);
+
+void __ubsan_handle_mul_overflow(void *_data,
+				void *lhs, void *rhs)
+{
+}
+EXPORT_SYMBOL(__ubsan_handle_mul_overflow);
+
+void __ubsan_handle_negate_overflow(void *_data, void *old_val)
+{
+}
+EXPORT_SYMBOL(__ubsan_handle_negate_overflow);
+
+void __ubsan_handle_divrem_overflow(void *_data, void *lhs, void *rhs)
+{
+}
+EXPORT_SYMBOL(__ubsan_handle_divrem_overflow);
+
+void __ubsan_handle_type_mismatch(struct type_mismatch_data *data,
+				void *ptr)
+{
+}
+EXPORT_SYMBOL(__ubsan_handle_type_mismatch);
+
+void __ubsan_handle_type_mismatch_v1(void *_data, void *ptr)
+{
+}
+EXPORT_SYMBOL(__ubsan_handle_type_mismatch_v1);
+
 void __ubsan_handle_out_of_bounds(void *_data, void *index)
 {
 	struct out_of_bounds_data *data = _data;
 	struct kvm_debug_info *crt;
     struct out_of_bounds_data *aux_cont;
     unsigned int wr_index = __this_cpu_read(kvm_buff_write_ind);
+
     if (wr_index < NMAX) {
         crt = this_cpu_ptr(&kvm_debug_buff[wr_index]);
         aux_cont = &crt->oo_bounds_data;
@@ -60,5 +100,33 @@ void __ubsan_handle_out_of_bounds(void *_data, void *index)
 }
 EXPORT_SYMBOL(__ubsan_handle_out_of_bounds);
 
+void __ubsan_handle_shift_out_of_bounds(void *_data, void *lhs, void *rhs)
+{
+}
+EXPORT_SYMBOL(__ubsan_handle_shift_out_of_bounds);
 
+
+void __ubsan_handle_builtin_unreachable(void *_data)
+{
+	struct unreachable_data *data = _data;
+	struct kvm_debug_info *crt;
+    struct unreachable_data *aux_cont;
+    unsigned int wr_index = __this_cpu_read(kvm_buff_write_ind);
+
+    if (wr_index < NMAX) {
+        crt = this_cpu_ptr(&kvm_debug_buff[wr_index]);
+        aux_cont = &crt->unreach_data;
+        crt->type = UBSAN_UNREACH_DATA;
+        copy_source_location_struct(&aux_cont->location, &data->location);
+        ++wr_index;
+        __this_cpu_write(kvm_buff_write_ind, wr_index);
+    }
+}
+EXPORT_SYMBOL(__ubsan_handle_builtin_unreachable);
+
+void __ubsan_handle_load_invalid_value(void *_data, void *val)
+{
+
+}
+EXPORT_SYMBOL(__ubsan_handle_load_invalid_value);
 #endif

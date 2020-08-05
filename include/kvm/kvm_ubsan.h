@@ -11,6 +11,11 @@ GNU General Public License for more details.
  */
 #define UBSAN_MAX_TYPE 6
 #define UBSAN_OO_BOUNDS 1
+#define UBSAN_SOO_BOUNDS 2
+#define UBSAN_UNREACH_DATA 3
+#define UBSAN_INVALID_DATA 4
+#define UBSAN_MISM_DATA 5
+#define UBSAN_OVFW_DATA 6
 
 #ifndef _LIB_UBSAN_H
 #define _LIB_UBSAN_H
@@ -93,6 +98,7 @@ struct invalid_value_data {
 };
 
 void __ubsan_handle_out_of_bounds(void *_data, void *index);
+void __ubsan_handle_builtin_unreachable(void *_data);
 
 #if defined(CONFIG_ARCH_SUPPORTS_INT128)
 typedef __int128 s_max;
