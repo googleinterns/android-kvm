@@ -60,31 +60,64 @@ void write_type_mismatch_data(struct type_mismatch_data_common *data, void *lval
     }
 }
 
+void write_overflow_data(struct overflow_data *data, void *lval, void *rval, char op)
+{
+    struct kvm_debug_info *crt;
+    struct overflow_data *aux_cont;
+    unsigned int wr_index = __this_cpu_read(kvm_buff_write_ind);
+	
+    if (wr_index < NMAX) {
+        crt = this_cpu_ptr(&kvm_debug_buff[wr_index]);
+        aux_cont = &crt->ovfw_data;
+        crt->type = UBSAN_OVFW_DATA;
+        copy_source_location_struct(&aux_cont->location, &data->location);
+        copy_type_descriptor(&aux_cont->type, &data->type);
+        crt->u_val.op = op;
+        crt->u_val.lval = lval;
+        if (op != '!') {
+            crt->u_val.rval = rval;
+        }
+        ++wr_index;
+        __this_cpu_write(kvm_buff_write_ind, wr_index);
+    }
+}
+
 void __ubsan_handle_add_overflow(void *_data,
 				void *lhs, void *rhs)
 {
+	struct overflow_data *data = _data;
+	write_overflow_data(data, lhs, rhs, '+');
+
 }
 EXPORT_SYMBOL(__ubsan_handle_add_overflow);
 
 void __ubsan_handle_sub_overflow(void *_data,
 				void *lhs, void *rhs)
 {
+	struct overflow_data *data = _data;
+	write_overflow_data(data, lhs, rhs, '-');
 }
 EXPORT_SYMBOL(__ubsan_handle_sub_overflow);
 
 void __ubsan_handle_mul_overflow(void *_data,
 				void *lhs, void *rhs)
 {
+	struct overflow_data *data = _data;
+	write_overflow_data(data, lhs, rhs, '*');
 }
 EXPORT_SYMBOL(__ubsan_handle_mul_overflow);
 
 void __ubsan_handle_negate_overflow(void *_data, void *old_val)
 {
+	struct overflow_data *data = _data;
+	write_overflow_data(data, old_val, NULL, '!');
 }
 EXPORT_SYMBOL(__ubsan_handle_negate_overflow);
 
 void __ubsan_handle_divrem_overflow(void *_data, void *lhs, void *rhs)
 {
+	struct overflow_data *data = _data;
+	write_overflow_data(data, lhs, rhs, '/');
 }
 EXPORT_SYMBOL(__ubsan_handle_divrem_overflow);
 
