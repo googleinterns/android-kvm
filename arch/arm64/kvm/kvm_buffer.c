@@ -62,6 +62,7 @@ void __kvm_check_ubsan_data(struct kvm_debug_info *crt)
                 __ubsan_handle_load_invalid_value(&crt->invld_val_data, crt->u_val.lval);
                 break;
             case UBSAN_MISM_DATA:
+                __ubsan_handle_type_mismatch(&crt->mism_data, crt->u_val.lval);
                 break;
             case UBSAN_OVFW_DATA:
                 break;
