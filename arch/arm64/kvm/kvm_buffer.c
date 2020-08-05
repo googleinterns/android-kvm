@@ -52,6 +52,8 @@ void __kvm_check_ubsan_data(struct kvm_debug_info *crt)
                 __ubsan_handle_out_of_bounds(&crt->oo_bounds_data, crt->u_val.lval);
                 break;
             case UBSAN_SOO_BOUNDS:
+                __ubsan_handle_shift_out_of_bounds(&crt->soo_bounds_data, crt->u_val.lval, 
+                                    crt->u_val.rval);
                 break;
             case UBSAN_UNREACH_DATA:
                 __ubsan_handle_builtin_unreachable(&crt->unreach_data);

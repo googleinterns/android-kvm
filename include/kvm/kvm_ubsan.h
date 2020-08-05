@@ -99,6 +99,7 @@ struct invalid_value_data {
 
 void __ubsan_handle_out_of_bounds(void *_data, void *index);
 void __ubsan_handle_builtin_unreachable(void *_data);
+void __ubsan_handle_shift_out_of_bounds(void *_data, void *lhs, void *rhs);
 
 #if defined(CONFIG_ARCH_SUPPORTS_INT128)
 typedef __int128 s_max;
