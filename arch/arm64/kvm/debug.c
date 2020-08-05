@@ -245,4 +245,3 @@ void __kvm_arm_check_debug_buffer(void)
 		__kvm_check_ubsan_buffer();
 }
 #endif
-
