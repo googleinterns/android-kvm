@@ -1604,7 +1604,13 @@ static int init_hyp_mode(void)
 		kvm_err("Cannot map bss section\n");
 		goto out_err;
 	}
-
+#ifdef CONFIG_UBSAN
+	err = create_hyp_mappings(kvm_ksym_ref(_data),
+				  kvm_ksym_ref(__end_once), PAGE_HYP);
+	if (err) {
+		kvm_err("Cannot map data section\n");
+	}
+#endif
 	err = kvm_map_vectors();
 	if (err) {
 		kvm_err("Cannot map vectors\n");

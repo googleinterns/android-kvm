@@ -482,6 +482,19 @@ int kvm_test_age_hva(struct kvm *kvm, unsigned long hva);
 void kvm_arm_halt_guest(struct kvm *kvm);
 void kvm_arm_resume_guest(struct kvm *kvm);
 
+#ifdef CONFIG_UBSAN
+void __kvm_check_buffer(void);
+#define kvm_call_hyp_nvhe(f, ...)						\
+	({								\
+		struct arm_smccc_res res;				\
+									\
+		arm_smccc_1_1_hvc(KVM_HOST_SMCCC_FUNC(f),		\
+				  ##__VA_ARGS__, &res);			\
+		WARN_ON(res.a0 != SMCCC_RET_SUCCESS);			\
+		__kvm_check_buffer();							\
+		res.a1;							\
+	})
+#else 
 #define kvm_call_hyp_nvhe(f, ...)						\
 	({								\
 		struct arm_smccc_res res;				\
@@ -492,7 +505,7 @@ void kvm_arm_resume_guest(struct kvm *kvm);
 									\
 		res.a1;							\
 	})
-
+#endif 
 /*
  * The couple of isb() below are there to guarantee the same behaviour
  * on VHE as on !VHE, where the eret to EL1 acts as a context
