@@ -5,6 +5,7 @@
 
 asflags-y := -D__KVM_NVHE_HYPERVISOR__
 ccflags-y := -D__KVM_NVHE_HYPERVISOR__
+ccflags-y += -I $(srctree)/lib/
 
 obj-y := timer-sr.o sysreg-sr.o debug-sr.o switch.o tlb.o hyp-init.o \
 	 hyp-start.o hyp-main.o

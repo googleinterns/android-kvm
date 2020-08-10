@@ -482,6 +482,12 @@ int kvm_test_age_hva(struct kvm *kvm, unsigned long hva);
 void kvm_arm_halt_guest(struct kvm *kvm);
 void kvm_arm_resume_guest(struct kvm *kvm);
 
+#ifdef CONFIG_UBSAN
+extern void __kvm_check_buffer(void);
+#else
+static inline void __kvm_check_buffer(void) {}
+#endif /* CONFIG_UBSAN */
+
 #define kvm_call_hyp_nvhe(f, ...)						\
 	({								\
 		struct arm_smccc_res res;				\
@@ -489,7 +495,7 @@ void kvm_arm_resume_guest(struct kvm *kvm);
 		arm_smccc_1_1_hvc(KVM_HOST_SMCCC_FUNC(f),		\
 				  ##__VA_ARGS__, &res);			\
 		WARN_ON(res.a0 != SMCCC_RET_SUCCESS);			\
-									\
+		__kvm_check_buffer();							\
 		res.a1;							\
 	})
 

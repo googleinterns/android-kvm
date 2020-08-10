@@ -13,6 +13,14 @@
 
 #include <kvm/arm_hypercalls.h>
 
+#ifdef CONFIG_UBSAN
+#include <asm/kvm_debug_buffer.h>
+
+DEFINE_PER_CPU(struct kvm_debug_info, kvm_debug_buffer)[NMAX];
+DEFINE_PER_CPU(unsigned int, kvm_buff_write_ind) = 0;
+
+#endif
+
 typedef __noreturn unsigned long (*stub_hvc_handler_t)
 	(unsigned long, unsigned long, unsigned long, unsigned long,
 	 unsigned long, struct kvm_cpu_context *);

@@ -4,6 +4,7 @@
 #
 
 ccflags-y += -I $(srctree)/$(src)
+ccflags-y += -I $(srctree)/lib/
 
 KVM=../../../virt/kvm
 
@@ -24,4 +25,5 @@ kvm-y := $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o \
 	 vgic/vgic-mmio-v3.o vgic/vgic-kvm-device.o \
 	 vgic/vgic-its.o vgic/vgic-debug.o
 
+kvm-$(CONFIG_UBSAN) += kvm_debug_buffer.o
 kvm-$(CONFIG_KVM_ARM_PMU)  += pmu-emul.o
