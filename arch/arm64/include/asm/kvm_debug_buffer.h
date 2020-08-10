@@ -17,6 +17,7 @@
 #define UBSAN_SOO_BOUNDS 2
 #define UBSAN_UNREACH_DATA 3
 #define UBSAN_INVALID_DATA 4
+#define UBSAN_MISM_DATA 5
 
 struct ubsan_values {
     void *lval;
@@ -51,3 +52,7 @@ void __ubsan_handle_out_of_bounds(void *_data, void *index);
 void __ubsan_handle_builtin_unreachable(void *_data);
 void __ubsan_handle_shift_out_of_bounds(void *_data, void *lhs, void *rhs);
 void __ubsan_handle_load_invalid_value(void *_data, void *val);
+<<<<<<< HEAD
+=======
+void __ubsan_handle_type_mismatch(struct type_mismatch_data  *_data, void *ptr);
+>>>>>>> ad2e66d1d12e... An implementation for _ubsan_handle_type_mismatch
