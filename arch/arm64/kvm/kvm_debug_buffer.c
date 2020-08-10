@@ -12,6 +12,17 @@
 #include <asm/kvm_asm.h>
 #include <kvm/arm_pmu.h>
 
+#ifndef CONFIG_UBSAN_TRAP
+void __kvm_check_ubsan_data(struct kvm_debug_info *crt)
+{
+    switch (crt->type) {
+            case UBSAN_OO_BOUNDS:
+                __ubsan_handle_out_of_bounds(&crt->oo_bounds_data, crt->u_val.lval);
+                break;
+    }
+}
+#endif
+
 void __kvm_check_buffer(void)
 {
     unsigned int i;
@@ -24,7 +35,8 @@ void __kvm_check_buffer(void)
         if (crt->type != 0) {
             if (crt->type <= UBSAN_MAX_TYPE) {
                 if (!IS_ENABLED(CONFIG_UBSAN_TRAP)) {
-                    /* check what is returned by UBSAN */ 
+                    /* check what is returned by UBSAN */
+                    __kvm_check_ubsan_data(crt); 
                 }
             }
         }

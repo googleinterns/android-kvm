@@ -13,6 +13,7 @@
 
 #define NMAX 1000
 #define UBSAN_MAX_TYPE 6
+#define UBSAN_OO_BOUNDS 1
 
 struct ubsan_values {
     void *lval;
@@ -42,3 +43,5 @@ struct kvm_debug_info {
     DECLARE_KVM_NVHE_PER_CPU(struct kvm_debug_info, kvm_debug_buffer)[NMAX];
     DECLARE_KVM_NVHE_PER_CPU(unsigned int, kvm_buff_write_ind);
 #endif   
+
+void __ubsan_handle_out_of_bounds(void *_data, void *index);
