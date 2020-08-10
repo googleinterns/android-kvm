@@ -90,4 +90,21 @@ void __ubsan_handle_builtin_unreachable(void *_data)
     }
 }
 
-void __ubsan_handle_load_invalid_value(void *_data, void *val){}
+void __ubsan_handle_load_invalid_value(void *_data, void *val){
+    struct invalid_value_data *data = _data;
+	struct kvm_debug_info *crt;
+    struct invalid_value_data *aux_cont;
+    unsigned int wr_index = __this_cpu_read(kvm_buff_write_ind);
+
+    if (wr_index < NMAX) {
+        crt = this_cpu_ptr(&kvm_debug_buffer[wr_index]);
+        aux_cont = &crt->invld_val_data;
+        crt->type = UBSAN_INVALID_DATA;
+        aux_cont->location.file_name = data->location.file_name;
+        aux_cont->location.reported = data->location.reported;
+        aux_cont->type = data->type;
+        crt->u_val.lval = val;
+        ++wr_index;
+        __this_cpu_write(kvm_buff_write_ind, wr_index);
+    }
+}

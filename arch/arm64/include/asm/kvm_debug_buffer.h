@@ -16,6 +16,7 @@
 #define UBSAN_OO_BOUNDS 1
 #define UBSAN_SOO_BOUNDS 2
 #define UBSAN_UNREACH_DATA 3
+#define UBSAN_INVALID_DATA 4
 
 struct ubsan_values {
     void *lval;
@@ -49,3 +50,4 @@ struct kvm_debug_info {
 void __ubsan_handle_out_of_bounds(void *_data, void *index);
 void __ubsan_handle_builtin_unreachable(void *_data);
 void __ubsan_handle_shift_out_of_bounds(void *_data, void *lhs, void *rhs);
+void __ubsan_handle_load_invalid_value(void *_data, void *val);
