@@ -6,7 +6,13 @@ ifdef CONFIG_UBSAN_ALIGNMENT
 endif
 
 ifdef CONFIG_UBSAN_BOUNDS
-      CFLAGS_UBSAN += $(call cc-option, -fsanitize=bounds)
+      # for clang -fsanitize=bounds means -fsanitize=local-bounds and 
+      # -fsanitize=array-bounds which adds a break right after the handler is called
+      ifeq (,$(call cc-option, -fsanitize=array-bounds))
+            CFLAGS_UBSAN += $(call cc-option, -fsanitize=bounds)
+      else
+            CFLAGS_UBSAN += $(call cc-option, -fsanitize=array-bounds)
+      endif
 endif
 
 ifdef CONFIG_UBSAN_MISC
