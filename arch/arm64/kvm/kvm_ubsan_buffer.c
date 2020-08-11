@@ -18,6 +18,15 @@ DECLARE_KVM_DEBUG_BUFFER(struct kvm_ubsan_info, kvm_ubsan_buffer,
 		kvm_ubsan_buff_wr_ind, kvm_ubsan_buff_rd_ind,
 		KVM_UBSAN_BUFFER_SIZE);
 
+void __kvm_check_ubsan_data(struct kvm_ubsan_info *slot)
+{
+	switch (slot->type) {
+	case UBSAN_OUT_OF_BOUNDS:
+		__ubsan_handle_out_of_bounds(&slot->out_of_bounds_data,
+				slot->u_val.lval);
+		break;
+	}
+}
 
 void iterate_kvm_ubsan_buffer(unsigned long left, unsigned long right)
 {
@@ -31,7 +40,7 @@ void iterate_kvm_ubsan_buffer(unsigned long left, unsigned long right)
 		if (ind >=  KVM_UBSAN_BUFFER_SIZE) {
 			ind = 0;
 		}
-		/* check ubsan data */
+		__kvm_check_ubsan_data(slot + ind);
 		slot[i].type = 0;
 	}
 }
