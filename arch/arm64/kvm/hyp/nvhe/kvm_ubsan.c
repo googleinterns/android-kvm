@@ -32,7 +32,7 @@ static inline struct kvm_ubsan_info *kvm_ubsan_buffer_next_slot(void)
 
 void __ubsan_handle_add_overflow(void *_data, void *lhs, void *rhs) {}
 
-void __ubsan_handle_sub_overflow(void *_data, void *lhs, void *rhs){}
+void __ubsan_handle_sub_overflow(void *_data, void *lhs, void *rhs) {}
 
 void __ubsan_handle_mul_overflow(void *_data, void *lhs, void *rhs) {}
 
@@ -60,6 +60,16 @@ void __ubsan_handle_out_of_bounds(void *_data, void *index)
 
 void __ubsan_handle_shift_out_of_bounds(void *_data, void *lhs, void *rhs) {}
 
-void __ubsan_handle_builtin_unreachable(void *_data) {}
+void __ubsan_handle_builtin_unreachable(void *_data)
+{
+	struct kvm_ubsan_info *slot;
+	struct unreachable_data *data = _data;
+
+	slot = kvm_ubsan_buffer_next_slot();
+	if (slot) {
+		slot->type = UBSAN_UNREACHABLE_DATA;
+		slot->unreachable_data = *data;
+	}
+}
 
 void __ubsan_handle_load_invalid_value(void *_data, void *val) {}
