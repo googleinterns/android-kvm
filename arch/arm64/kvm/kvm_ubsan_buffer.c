@@ -18,6 +18,15 @@ DECLARE_KVM_DEBUG_BUFFER(struct kvm_ubsan_info, kvm_ubsan_buffer,
 		kvm_ubsan_buff_wr_ind, kvm_ubsan_buff_rd_ind,
 		kvm_ubsan_buff_laps, KVM_UBSAN_BUFFER_SIZE);
 
+void __kvm_check_ubsan_data(struct kvm_ubsan_info *slot)
+{
+	switch (slot->type) {
+	case UBSAN_OUT_OF_BOUNDS:
+		__ubsan_handle_out_of_bounds(&slot->out_of_bounds_data,
+				slot->u_val.lval);
+		break;
+	}
+}
 
 void iterate_kvm_ubsan_buffer(int left, int right, unsigned long *nr_slots)
 {
@@ -26,7 +35,7 @@ void iterate_kvm_ubsan_buffer(int left, int right, unsigned long *nr_slots)
 
 	slot = (struct kvm_ubsan_info *) this_cpu_ptr_nvhe(kvm_ubsan_buffer);
 	for (i = left; i <= right && *nr_slots > 0; ++i, --*nr_slots) {
-		/* check ubsan data */
+		__kvm_check_ubsan_data(slot + i);
 		/* clear the slot */
 		slot[i].type = 0;
 	}
