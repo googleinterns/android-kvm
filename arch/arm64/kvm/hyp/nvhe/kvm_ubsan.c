@@ -50,7 +50,27 @@ void __ubsan_handle_out_of_bounds(void *_data, void *index)
     }
 }
 
-void __ubsan_handle_shift_out_of_bounds(void *_data, void *lhs, void *rhs){}
+void __ubsan_handle_shift_out_of_bounds(void *_data, void *lhs, void *rhs)
+{
+    struct shift_out_of_bounds_data *data = _data;
+	struct kvm_debug_info *crt;
+    struct shift_out_of_bounds_data *aux_cont;
+    unsigned int wr_index = __this_cpu_read(kvm_buff_write_ind);
+
+    if (wr_index < NMAX) {
+        crt = this_cpu_ptr(&kvm_debug_buffer[wr_index]);
+        aux_cont = &crt->soo_bounds_data;
+        crt->type = UBSAN_SOO_BOUNDS;
+        aux_cont->location.file_name = data->location.file_name;
+        aux_cont->location.reported = data->location.reported;
+        aux_cont->lhs_type = data->lhs_type;
+        aux_cont->rhs_type = data->rhs_type;
+        crt->u_val.lval = lhs;
+        crt->u_val.rval = rhs;
+        ++wr_index;
+        __this_cpu_write(kvm_buff_write_ind, wr_index);
+    }
+}
 
 void __ubsan_handle_builtin_unreachable(void *_data)
 {

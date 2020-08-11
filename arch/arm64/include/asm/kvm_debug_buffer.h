@@ -14,6 +14,7 @@
 #define NMAX 1000
 #define UBSAN_MAX_TYPE 6
 #define UBSAN_OO_BOUNDS 1
+#define UBSAN_SOO_BOUNDS 2
 #define UBSAN_UNREACH_DATA 3
 
 struct ubsan_values {
@@ -47,3 +48,4 @@ struct kvm_debug_info {
 
 void __ubsan_handle_out_of_bounds(void *_data, void *index);
 void __ubsan_handle_builtin_unreachable(void *_data);
+void __ubsan_handle_shift_out_of_bounds(void *_data, void *lhs, void *rhs);
