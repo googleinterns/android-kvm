@@ -9,7 +9,6 @@
 #define UBSAN_MAX_TYPE 6
 #define KVM_UBSAN_BUFFER_SIZE 1000
 
-
 struct ubsan_values {
 	void *lval;
 	void *rval;
