@@ -150,6 +150,11 @@ SYM_FUNC_START(__hyp_do_panic)
 	mov	lr, #(PSR_F_BIT | PSR_I_BIT | PSR_A_BIT | PSR_D_BIT |\
 		      PSR_MODE_EL1h)
 	msr	spsr_el2, lr
+
+	adr_this_cpu x17, kvm_host_vcpu, x16
+	add     x17, x17, #VCPU_CONTEXT
+	restore_sp_el0 x17, x17
+
 	ldr	lr, =panic
 	msr	elr_el2, lr
 	eret
