@@ -1,0 +1,56 @@
+From 09e8c31fca48e9e8ede49cf32cc81435996f5db3 Mon Sep 17 00:00:00 2001
+From: George Popescu <georgepope@google.com>
+Date: Wed, 12 Aug 2020 12:01:26 +0000
+Subject: [PATCH 12/12] UBSAN and BUFFER  enablement -> DO NOT send this
+ forward
+
+Signed-off-by: George Popescu <georgepope@google.com>
+---
+ arch/arm64/include/asm/kvm_ubsan.h | 1 -
+ arch/arm64/kvm/Kconfig             | 1 +
+ lib/Kconfig.ubsan                  | 2 ++
+ 3 files changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/include/asm/kvm_ubsan.h b/arch/arm64/include/asm/kvm_ubsan.h
+index b6e713bf6652..d0b8b4886fbf 100644
+--- a/arch/arm64/include/asm/kvm_ubsan.h
++++ b/arch/arm64/include/asm/kvm_ubsan.h
+@@ -9,7 +9,6 @@
+ #define UBSAN_MAX_TYPE 6
+ #define KVM_UBSAN_BUFFER_SIZE 1000
+ 
+-
+ struct ubsan_values {
+ 	void *lval;
+ 	void *rval;
+diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+index 50d65baccf8b..578b5636097f 100644
+--- a/arch/arm64/kvm/Kconfig
++++ b/arch/arm64/kvm/Kconfig
+@@ -67,6 +67,7 @@ config KVM_ARM_HYP_DEBUG_UART_ADDR
+ 
+ config KVM_ARM_DEBUG_BUFFER
+ 	bool "Adds a buffer that can pass data from EL2 to EL1"
++	default y
+ 
+ config KVM_INDIRECT_VECTORS
+ 	def_bool HARDEN_BRANCH_PREDICTOR || RANDOMIZE_BASE
+diff --git a/lib/Kconfig.ubsan b/lib/Kconfig.ubsan
+index 774315de555a..513857e77659 100644
+--- a/lib/Kconfig.ubsan
++++ b/lib/Kconfig.ubsan
+@@ -1,9 +1,11 @@
+ # SPDX-License-Identifier: GPL-2.0-only
+ config ARCH_HAS_UBSAN_SANITIZE_ALL
+ 	bool
++	default y
+ 
+ menuconfig UBSAN
+ 	bool "Undefined behaviour sanity checker"
++	default y
+ 	help
+ 	  This option enables the Undefined Behaviour sanity checker.
+ 	  Compile-time instrumentation is used to detect various undefined
+-- 
+2.28.0.220.ged08abb693-goog
+

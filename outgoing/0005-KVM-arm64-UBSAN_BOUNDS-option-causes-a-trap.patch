@@ -1,0 +1,38 @@
+From 682f67bb117ccbc3441e604594abf4c1548af102 Mon Sep 17 00:00:00 2001
+From: George Popescu <georgepope@google.com>
+Date: Wed, 12 Aug 2020 14:39:41 +0000
+Subject: [PATCH 05/12] KVM: arm64: UBSAN_BOUNDS option causes a trap.
+
+When the kernel is compiled with Clang, UBSAN_BOUNDS inserts a brk after
+the handler call, preventing it from printing any information processed
+inside the buffer. To solve this the -fsanitize=array-bounds does
+different things for CLANG and gcc.
+
+Signed-off-by: George Popescu <georgepope@google.com>
+---
+ scripts/Makefile.ubsan | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/scripts/Makefile.ubsan b/scripts/Makefile.ubsan
+index 5b15bc425ec9..291032b79a53 100644
+--- a/scripts/Makefile.ubsan
++++ b/scripts/Makefile.ubsan
+@@ -6,7 +6,14 @@ ifdef CONFIG_UBSAN_ALIGNMENT
+ endif
+ 
+ ifdef CONFIG_UBSAN_BOUNDS
+-      CFLAGS_UBSAN += $(call cc-option, -fsanitize=bounds)
++      # For clang -fsanitize=bounds translates to -fsanitize=array-bounds and 
++      # -fsanitize=local-bounds; the last one adds a break right after the
++      # handler is called.
++      ifeq (,$(call cc-option, -fsanitize=array-bounds))
++            CFLAGS_UBSAN += $(call cc-option, -fsanitize=bounds)
++      else
++            CFLAGS_UBSAN += $(call cc-option, -fsanitize=array-bounds)
++      endif
+ endif
+ 
+ ifdef CONFIG_UBSAN_MISC
+-- 
+2.28.0.220.ged08abb693-goog
+

@@ -1,0 +1,89 @@
+From 172b345b980fa9fab113a70885d3a97c9b0d64a7 Mon Sep 17 00:00:00 2001
+From: George Popescu <georgepope@google.com>
+Date: Tue, 11 Aug 2020 08:49:04 +0000
+Subject: [PATCH 08/12] KVM: arm64: Shift out of bounds undefined behaviour
+ check enabled for EL2.
+
+__ubsan_handle_shift_out_of_bounds data is passed to the buffer inside
+EL2. This data is passed to the original handler at EL1.
+
+The lhs and rhs pointers passed to __ubsan_handle_shift_out_of_bounds
+are 64bit values, and represents the expression participants. (lhs <<
+rhs)
+
+Signed-off-by: George Popescu <georgepope@google.com>
+---
+ arch/arm64/include/asm/kvm_ubsan.h  |  7 +++++--
+ arch/arm64/kvm/hyp/nvhe/kvm_ubsan.c | 14 +++++++++++++-
+ arch/arm64/kvm/kvm_ubsan_buffer.c   |  4 ++++
+ 3 files changed, 22 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/include/asm/kvm_ubsan.h b/arch/arm64/include/asm/kvm_ubsan.h
+index df5377c0b56c..64a6e8c005b2 100644
+--- a/arch/arm64/include/asm/kvm_ubsan.h
++++ b/arch/arm64/include/asm/kvm_ubsan.h
+@@ -18,12 +18,14 @@ struct ubsan_values {
+ 
+ struct kvm_ubsan_info {
+     enum {
+-	UBSAN_OUT_OF_BOUNDS,
+-	UBSAN_UNREACHABLE_DATA
++        UBSAN_OUT_OF_BOUNDS,
++        UBSAN_UNREACHABLE_DATA,
++        UBSAN_SHIFT_OUT_OF_BOUNDS
+     } type;
+     union {
+         struct out_of_bounds_data out_of_bounds_data;
+         struct unreachable_data unreachable_data;
++        struct shift_out_of_bounds_data shift_out_of_bounds_data;
+     };
+     union {
+         struct ubsan_values u_val;
+@@ -32,3 +34,4 @@ struct kvm_ubsan_info {
+ 
+ void __ubsan_handle_out_of_bounds(void *_data, void *index);
+ void __ubsan_handle_builtin_unreachable(void *_data);
++void __ubsan_handle_shift_out_of_bounds(void *_data, void *lhs, void *rhs);
+diff --git a/arch/arm64/kvm/hyp/nvhe/kvm_ubsan.c b/arch/arm64/kvm/hyp/nvhe/kvm_ubsan.c
+index f392597ff8f8..92b2fad00e84 100644
+--- a/arch/arm64/kvm/hyp/nvhe/kvm_ubsan.c
++++ b/arch/arm64/kvm/hyp/nvhe/kvm_ubsan.c
+@@ -58,7 +58,19 @@ void __ubsan_handle_out_of_bounds(void *_data, void *index)
+ 	}
+ }
+ 
+-void __ubsan_handle_shift_out_of_bounds(void *_data, void *lhs, void *rhs) {}
++void __ubsan_handle_shift_out_of_bounds(void *_data, void *lhs, void *rhs)
++{
++	struct kvm_ubsan_info *slot;
++	struct shift_out_of_bounds_data *data = _data;
++
++	slot = kvm_ubsan_buffer_next_slot();
++	if (slot) {
++		slot->type = UBSAN_SHIFT_OUT_OF_BOUNDS;
++		slot->shift_out_of_bounds_data = *data;
++		slot->u_val.lval = lhs;
++		slot->u_val.rval = rhs;
++    	}
++}
+ 
+ void __ubsan_handle_builtin_unreachable(void *_data)
+ {
+diff --git a/arch/arm64/kvm/kvm_ubsan_buffer.c b/arch/arm64/kvm/kvm_ubsan_buffer.c
+index d0f18f5b9cf3..9bd736c9b618 100644
+--- a/arch/arm64/kvm/kvm_ubsan_buffer.c
++++ b/arch/arm64/kvm/kvm_ubsan_buffer.c
+@@ -28,6 +28,10 @@ void __kvm_check_ubsan_data(struct kvm_ubsan_info *slot)
+ 	case UBSAN_UNREACHABLE_DATA:
+ 		__ubsan_handle_builtin_unreachable(&slot->unreachable_data);
+ 		break;
++	case UBSAN_SHIFT_OUT_OF_BOUNDS:
++        	__ubsan_handle_shift_out_of_bounds(&slot->shift_out_of_bounds_data,
++				slot->u_val.lval, slot->u_val.rval);
++        	break;
+     	}
+ }
+ 
+-- 
+2.28.0.220.ged08abb693-goog
+

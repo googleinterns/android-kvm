@@ -1,0 +1,57 @@
+From 09e8c31fca48e9e8ede49cf32cc81435996f5db3 Mon Sep 17 00:00:00 2001
+From: George Popescu <georgepope@google.com>
+Date: Mon, 17 Aug 2020 16:16:00 +0000
+Subject: [PATCH 00/12] UBSAN enablement for Protected KVM
+
+Since the PKVM code lives in EL2 and the UBSAN handlers inside EL1,
+there are multiple challenges in UBSAN enablement.
+The main problem this patch series is trying to solve  is sending logging data
+from EL2 to EL1. In this case, it's implemented a circular buffer
+of constant size that will encapsulate the information needed
+by the UBSAN handlers. In this way, the buffer will store only the last
+KVM_DEBUG_BUFFER_SIZE messages.
+The buffer is dedicated for ubsan data, and uses all the structures
+defined inside lib/ubsan.h. It is achieved a simmetry between EL1 and EL2,
+as there is kvm_ubsan.c, where the EL2 ubsan_handlers are implemented
+and where data encapsulation is made. The  kvm_ubsan_buffer.c is responsible for
+decapsulating the data recieved at EL1, whenever the kernel returns from an hvc
+call.
+
+
+George Popescu (12):
+  KVM: arm64: The ubsan handlers are defined inside EL2.
+  KVM: arm64: UBSAN Trap function can reach Kernel Panic
+  KVM: ARM64: Add support for creating and checking a buffer
+  KVM: ARM64: Add a buffer that can pass UBSAN data from EL2 to EL1.
+  KVM: arm64: UBSAN_BOUNDS option causes a trap.
+  KVM: arm64: UBSAN_BOUNDS can be enabled for both EL1 and EL2
+  KVM: arm64: UBSAN check for unreachable code at EL2 enabled
+  KVM: arm64: Shift out of bounds undefined behaviour check enabled for
+    EL2.
+  KVM: arm64: __ubsan_handle_load_invalid_value EL2 implementation.
+  KVM: arm64: Type mismatch undefined behaviour detected at EL2
+  KVM: arm64: Arithmetic overflow is detected at EL2.
+  UBSAN and BUFFER  enablement -> DO NOT send this forward
+
+ arch/arm64/include/asm/kvm_debug_buffer.h |  31 ++++
+ arch/arm64/include/asm/kvm_host.h         |   8 +-
+ arch/arm64/include/asm/kvm_ubsan.h        |  49 +++++++
+ arch/arm64/kvm/Kconfig                    |   4 +
+ arch/arm64/kvm/Makefile                   |   2 +
+ arch/arm64/kvm/arm.c                      |   9 +-
+ arch/arm64/kvm/debug.c                    |  12 ++
+ arch/arm64/kvm/hyp/hyp-entry.S            |   5 +
+ arch/arm64/kvm/hyp/nvhe/Makefile          |   3 +-
+ arch/arm64/kvm/hyp/nvhe/kvm_ubsan.c       | 171 ++++++++++++++++++++++
+ arch/arm64/kvm/kvm_ubsan_buffer.c         | 122 +++++++++++++++
+ lib/Kconfig.ubsan                         |   2 +
+ scripts/Makefile.ubsan                    |   9 +-
+ 13 files changed, 423 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm64/include/asm/kvm_debug_buffer.h
+ create mode 100644 arch/arm64/include/asm/kvm_ubsan.h
+ create mode 100644 arch/arm64/kvm/hyp/nvhe/kvm_ubsan.c
+ create mode 100644 arch/arm64/kvm/kvm_ubsan_buffer.c
+
+-- 
+2.28.0.220.ged08abb693-goog
+

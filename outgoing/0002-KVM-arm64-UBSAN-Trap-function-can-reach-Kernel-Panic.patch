@@ -1,0 +1,33 @@
+From 7a973991aab74469c1c92d1b7d21881baa193459 Mon Sep 17 00:00:00 2001
+From: George Popescu <georgepope@google.com>
+Date: Thu, 13 Aug 2020 09:15:50 +0000
+Subject: [PATCH 02/12] KVM: arm64: UBSAN Trap function can reach Kernel Panic
+
+If UBSAN Trap is enabled and an Undefined Behaviour happens at EL2 the
+hyp_panic function is called. This is just a quick hack that restores
+the EL1 context.
+
+Signed-off-by: George Popescu <georgepope@google.com>
+---
+ arch/arm64/kvm/hyp/hyp-entry.S | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+index ea76528ba268..09134caf489f 100644
+--- a/arch/arm64/kvm/hyp/hyp-entry.S
++++ b/arch/arm64/kvm/hyp/hyp-entry.S
+@@ -132,6 +132,11 @@ SYM_FUNC_START(__hyp_do_panic)
+ 	mov	lr, #(PSR_F_BIT | PSR_I_BIT | PSR_A_BIT | PSR_D_BIT |\
+ 		      PSR_MODE_EL1h)
+ 	msr	spsr_el2, lr
++
++	adr_this_cpu x17, kvm_host_vcpu, x16
++	add     x17, x17, #VCPU_CONTEXT
++	restore_sp_el0 x17, x17
++	
+ 	ldr	lr, =panic
+ 	msr	elr_el2, lr
+ 	eret
+-- 
+2.28.0.220.ged08abb693-goog
+
