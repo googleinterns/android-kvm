@@ -3,8 +3,32 @@
  * Copyright 2020 Google LLC
  * Author: George Popescu <georgepope@google.com>
  */
+#include <linux/bitops.h>
+#include <linux/ctype.h>
 #include <linux/types.h>
+#include <linux/percpu-defs.h>
+#include <linux/kvm_host.h>
+#include <asm/kvm_arm.h>
+#include <asm/kvm_asm.h>
+#include <asm/kvm_ubsan.h>
+#include <asm/kvm_debug_buffer.h>
+#include <kvm/arm_pmu.h>
 #include <ubsan.h>
+
+DEFINE_KVM_DEBUG_BUFFER(struct kvm_ubsan_info, kvm_ubsan_buffer,
+                kvm_ubsan_buff_wr_ind, KVM_UBSAN_BUFFER_SIZE);
+
+static inline struct kvm_ubsan_info *kvm_ubsan_buffer_next_slot(void)
+{
+	struct kvm_ubsan_info *res = NULL;
+	unsigned long write_ind = __this_cpu_read(kvm_ubsan_buff_wr_ind);
+	unsigned long current_pos = write_ind % KVM_UBSAN_BUFFER_SIZE;
+
+	res = this_cpu_ptr(&kvm_ubsan_buffer[current_pos]);
+	++write_ind;
+	__this_cpu_write(kvm_ubsan_buff_wr_ind, write_ind);
+	return res;
+}
 
 void __ubsan_handle_add_overflow(void *_data, void *lhs, void *rhs) {}
 
