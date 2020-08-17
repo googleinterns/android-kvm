@@ -231,3 +231,15 @@ void kvm_arm_clear_debug(struct kvm_vcpu *vcpu)
 		}
 	}
 }
+
+#ifdef CONFIG_UBSAN
+extern void __kvm_check_ubsan_buffer(void);
+#else
+static inline void __kvm_check_ubsan_buffer(void) {}
+#endif
+
+void __kvm_arm_check_debug_buffer() {
+	if (IS_ENABLED(CONFIG_UBSAN)) {
+		__kvm_check_ubsan_buffer();
+	}
+}
