@@ -231,3 +231,7 @@ void kvm_arm_clear_debug(struct kvm_vcpu *vcpu)
 		}
 	}
 }
+
+#ifdef CONFIG_KVM_ARM_DEBUG_BUFFER
+void __kvm_arm_check_debug_buffer() {}
+#endif

@@ -3,7 +3,10 @@
  * Copyright 2020 Google LLC
  * Author: George Popescu <georgepope@google.com>
  */
+#include <linux/ctype.h>
+#include <linux/types.h>
 #include <ubsan.h>
+
 
 void __ubsan_handle_add_overflow(void *_data, void *lhs, void *rhs) {}
 
