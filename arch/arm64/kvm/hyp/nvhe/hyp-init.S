@@ -7,6 +7,7 @@
 #include <linux/arm-smccc.h>
 #include <linux/linkage.h>
 
+#include <asm/alternative.h>
 #include <asm/assembler.h>
 #include <asm/kvm_arm.h>
 #include <asm/kvm_asm.h>
