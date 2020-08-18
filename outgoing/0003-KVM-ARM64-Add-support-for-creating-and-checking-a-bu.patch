@@ -1,0 +1,121 @@
+From 7e1cfa20f1bfa7e2b20369dcbe698774681e2e77 Mon Sep 17 00:00:00 2001
+From: George Popescu <georgepope@google.com>
+Date: Mon, 17 Aug 2020 09:17:32 +0000
+Subject: [PATCH 03/12] KVM: ARM64: Add support for creating and checking a
+ buffer
+
+The KVM_ARM_DEBUG_BUFFER option enables checking the buffer every time when
+the state returns back to EL1 after an hvc call.
+The __kvm_arm_check_debug_buffer checks if there is any data from EL2 UBSAN,
+or the moment, but it can be extended into checking data from other tools
+like KCOV and GCOV.
+The macros can be used to define a buffer at EL2, and to declare it at EL1.
+
+Signed-off-by: George Popescu <georgepope@google.com>
+---
+ arch/arm64/include/asm/kvm_debug_buffer.h | 30 +++++++++++++++++++++++
+ arch/arm64/include/asm/kvm_host.h         |  8 +++++-
+ arch/arm64/kvm/Kconfig                    |  3 +++
+ arch/arm64/kvm/debug.c                    | 12 +++++++++
+ 4 files changed, 52 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/include/asm/kvm_debug_buffer.h
+
+diff --git a/arch/arm64/include/asm/kvm_debug_buffer.h b/arch/arm64/include/asm/kvm_debug_buffer.h
+new file mode 100644
+index 000000000000..d7dcda0ebe0b
+--- /dev/null
++++ b/arch/arm64/include/asm/kvm_debug_buffer.h
+@@ -0,0 +1,30 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Copyright 2020 Google LLC
++ * Author: George Popescu <georgepope@google.com>
++ */
++
++#include <linux/percpu-defs.h>
++#include <asm/kvm_arm.h>
++#include <asm/kvm_asm.h>
++#include <linux/kvm_host.h>
++#include <kvm/arm_pmu.h>
++
++#define KVM_DEBUG_BUFFER_SIZE 1000
++
++#ifdef __KVM_NVHE_HYPERVISOR__
++#define DEFINE_KVM_DEBUG_BUFFER(type_name, buffer_name, write_ind, size)\
++	DEFINE_PER_CPU(type_name, buffer_name)[size];			\
++	DEFINE_PER_CPU(unsigned long, write_ind) = 0; 
++
++#define DECLARE_KVM_DEBUG_BUFFER(type_name, buffer_name, write_ind, size)\
++	DECLARE_PER_CPU(type_name, buffer_name)[size];			\
++	DECLARE_PER_CPU(unsigned long, write_ind);
++#else
++#define DECLARE_KVM_DEBUG_BUFFER(type_name, buffer_name, write_ind,	\
++			read_ind, laps_did, size) \
++	DECLARE_KVM_NVHE_PER_CPU(type_name, buffer_name)[size]; 	\
++	DECLARE_KVM_NVHE_PER_CPU(unsigned long, write_ind);		\
++	DEFINE_PER_CPU(unsigned long, read_ind) = 0;			\
++	DEFINE_PER_CPU(unsigned long, laps_did) = 0;
++#endif   
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index c09cba046295..0fa50e84df7a 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -482,6 +482,12 @@ int kvm_test_age_hva(struct kvm *kvm, unsigned long hva);
+ void kvm_arm_halt_guest(struct kvm *kvm);
+ void kvm_arm_resume_guest(struct kvm *kvm);
+ 
++#ifdef CONFIG_KVM_ARM_DEBUG_BUFFER
++extern void __kvm_arm_check_debug_buffer(void);
++#else
++static inline void __kvm_arm_check_debug_buffer(void) {}
++#endif /* CONFIG_KVM_DEBUG_BUFFER */
++
+ #define kvm_call_hyp_nvhe(f, ...)						\
+ 	({								\
+ 		struct arm_smccc_res res;				\
+@@ -489,7 +495,7 @@ void kvm_arm_resume_guest(struct kvm *kvm);
+ 		arm_smccc_1_1_hvc(KVM_HOST_SMCCC_FUNC(f),		\
+ 				  ##__VA_ARGS__, &res);			\
+ 		WARN_ON(res.a0 != SMCCC_RET_SUCCESS);			\
+-									\
++		__kvm_arm_check_debug_buffer();				\
+ 		res.a1;							\
+ 	})
+ 
+diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+index caf820d326c0..50d65baccf8b 100644
+--- a/arch/arm64/kvm/Kconfig
++++ b/arch/arm64/kvm/Kconfig
+@@ -65,6 +65,9 @@ config KVM_ARM_HYP_DEBUG_UART_ADDR
+ 	depends on KVM_ARM_HYP_DEBUG_UART
+ 	default 0x09000000
+ 
++config KVM_ARM_DEBUG_BUFFER
++	bool "Adds a buffer that can pass data from EL2 to EL1"
++
+ config KVM_INDIRECT_VECTORS
+ 	def_bool HARDEN_BRANCH_PREDICTOR || RANDOMIZE_BASE
+ 
+diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
+index e9932618a362..7f64929395fd 100644
+--- a/arch/arm64/kvm/debug.c
++++ b/arch/arm64/kvm/debug.c
+@@ -231,3 +231,15 @@ void kvm_arm_clear_debug(struct kvm_vcpu *vcpu)
+ 		}
+ 	}
+ }
++
++#ifdef CONFIG_UBSAN
++extern void __kvm_check_ubsan_buffer(void);
++#else
++static inline void __kvm_check_ubsan_buffer(void) {}
++#endif
++
++void __kvm_arm_check_debug_buffer() {
++	if (IS_ENABLED(CONFIG_UBSAN)) {
++		__kvm_check_ubsan_buffer();
++	}
++}
+-- 
+2.28.0.220.ged08abb693-goog
+

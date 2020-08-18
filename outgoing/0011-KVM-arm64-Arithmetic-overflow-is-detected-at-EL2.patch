@@ -1,0 +1,143 @@
+From c7657bc53cc8de5eac04e1b7d3a831ff3271f70e Mon Sep 17 00:00:00 2001
+From: George Popescu <georgepope@google.com>
+Date: Wed, 5 Aug 2020 13:32:24 +0000
+Subject: [PATCH 11/12] KVM: arm64: Arithmetic overflow is detected at EL2.
+
+Whenever an arithmetic overflow as: addition, substraction,
+multiplication, division or negating happens at EL2, an __ubsan_handle is
+called.
+All the overflow handlers are sharing the same structure called
+overflow_data
+
+Signed-off-by: George Popescu <georgepope@google.com>
+---
+ arch/arm64/include/asm/kvm_ubsan.h  | 10 +++++--
+ arch/arm64/kvm/hyp/nvhe/kvm_ubsan.c | 46 +++++++++++++++++++++++++----
+ arch/arm64/kvm/kvm_ubsan_buffer.c   | 18 +++++++++++
+ 3 files changed, 67 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm64/include/asm/kvm_ubsan.h b/arch/arm64/include/asm/kvm_ubsan.h
+index 7216fe524d39..b6e713bf6652 100644
+--- a/arch/arm64/include/asm/kvm_ubsan.h
++++ b/arch/arm64/include/asm/kvm_ubsan.h
+@@ -22,7 +22,8 @@ struct kvm_ubsan_info {
+         UBSAN_UNREACHABLE_DATA,
+         UBSAN_SHIFT_OUT_OF_BOUNDS,
+         UBSAN_INVALID_DATA,
+-        UBSAN_TYPE_MISMATCH
++        UBSAN_TYPE_MISMATCH,
++        UBSAN_OVERFLOW_DATA
+     } type;
+     union {
+         struct out_of_bounds_data out_of_bounds_data;
+@@ -30,6 +31,7 @@ struct kvm_ubsan_info {
+         struct shift_out_of_bounds_data shift_out_of_bounds_data;
+         struct invalid_value_data invalid_value_data;
+         struct type_mismatch_data type_mismatch_data;
++        struct overflow_data overflow_data;
+     };
+     union {
+         struct ubsan_values u_val;
+@@ -41,4 +43,8 @@ void __ubsan_handle_builtin_unreachable(void *_data);
+ void __ubsan_handle_shift_out_of_bounds(void *_data, void *lhs, void *rhs);
+ void __ubsan_handle_load_invalid_value(void *_data, void *val);
+ void __ubsan_handle_type_mismatch(struct type_mismatch_data  *_data, void *ptr);
+-
++void __ubsan_handle_add_overflow(void *data, void *lhs, void *rhs);
++void __ubsan_handle_sub_overflow(void *data, void *lhs, void *rhs);
++void __ubsan_handle_mul_overflow(void *data, void *lhs, void *rhs);
++void __ubsan_handle_negate_overflow(void *_data, void *old_val);
++void __ubsan_handle_divrem_overflow(void *_data, void *lhs, void *rhs);
+diff --git a/arch/arm64/kvm/hyp/nvhe/kvm_ubsan.c b/arch/arm64/kvm/hyp/nvhe/kvm_ubsan.c
+index 5851be4bdaec..500c5a944b04 100644
+--- a/arch/arm64/kvm/hyp/nvhe/kvm_ubsan.c
++++ b/arch/arm64/kvm/hyp/nvhe/kvm_ubsan.c
+@@ -48,15 +48,51 @@ void write_type_mismatch_data(struct type_mismatch_data_common *data, void *lval
+     }
+ }
+ 
+-void __ubsan_handle_add_overflow(void *_data, void *lhs, void *rhs){}
++void write_overflow_data(struct overflow_data *data, void *lval, void *rval,
++		char op)
++{
++	struct kvm_ubsan_info *slot = kvm_ubsan_buffer_next_slot();
+ 
+-void __ubsan_handle_sub_overflow(void *_data, void *lhs, void *rhs) {}
++	if (slot) {
++		slot->overflow_data = *data;
++		slot->type = UBSAN_OVERFLOW_DATA;
++		slot->u_val.op = op;
++		slot->u_val.lval = lval;
++		if (op != '!')
++			slot->u_val.rval = rval;
++	}
++}
+ 
+-void __ubsan_handle_mul_overflow(void *_data, void *lhs, void *rhs) {}
++void __ubsan_handle_add_overflow(void *_data, void *lhs, void *rhs)
++{
++	struct overflow_data *data = _data;
++	write_overflow_data(data, lhs, rhs, '+');
+ 
+-void __ubsan_handle_negate_overflow(void *_data, void *old_val) {}
++}
++
++void __ubsan_handle_sub_overflow(void *_data, void *lhs, void *rhs)
++{
++	struct overflow_data *data = _data;
++	write_overflow_data(data, lhs, rhs, '-');
++}
+ 
+-void __ubsan_handle_divrem_overflow(void *_data, void *lhs, void *rhs) {}
++void __ubsan_handle_mul_overflow(void *_data, void *lhs, void *rhs)
++{
++	struct overflow_data *data = _data;
++	write_overflow_data(data, lhs, rhs, '*');
++}
++
++void __ubsan_handle_negate_overflow(void *_data, void *old_val)
++{
++	struct overflow_data *data = _data;
++	write_overflow_data(data, old_val, NULL, '!');
++}
++
++void __ubsan_handle_divrem_overflow(void *_data, void *lhs, void *rhs)
++{
++	struct overflow_data *data = _data;
++	write_overflow_data(data, lhs, rhs, '/');
++}
+ 
+ void __ubsan_handle_type_mismatch(struct type_mismatch_data *data,
+ 				void *ptr)
+diff --git a/arch/arm64/kvm/kvm_ubsan_buffer.c b/arch/arm64/kvm/kvm_ubsan_buffer.c
+index 7a9786f5d5c1..8b58e72cb8e3 100644
+--- a/arch/arm64/kvm/kvm_ubsan_buffer.c
++++ b/arch/arm64/kvm/kvm_ubsan_buffer.c
+@@ -40,6 +40,24 @@ void __kvm_check_ubsan_data(struct kvm_ubsan_info *slot)
+ 		__ubsan_handle_type_mismatch(&slot->type_mismatch_data,
+ 				slot->u_val.lval);
+ 		break;
++	case UBSAN_OVERFLOW_DATA:
++		if (slot->u_val.op == '/') {
++			__ubsan_handle_divrem_overflow(&slot->overflow_data,
++					slot->u_val.lval, slot->u_val.rval);
++		} else if (slot->u_val.op == '!') {
++			__ubsan_handle_negate_overflow(&slot->overflow_data,
++					slot->u_val.lval);
++		} else if (slot->u_val.op == '+') {
++			__ubsan_handle_add_overflow(&slot->overflow_data,
++					slot->u_val.lval, slot->u_val.rval);
++		} else if (slot->u_val.op == '-') {
++			__ubsan_handle_sub_overflow(&slot->overflow_data,
++					slot->u_val.lval, slot->u_val.rval);
++		} else if (slot->u_val.op == '*') {
++			__ubsan_handle_mul_overflow(&slot->overflow_data,
++					slot->u_val.lval, slot->u_val.rval);
++        	}
++        	break;
+     	}
+ }
+ 
+-- 
+2.28.0.220.ged08abb693-goog
+

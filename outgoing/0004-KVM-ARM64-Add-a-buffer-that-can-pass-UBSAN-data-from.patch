@@ -1,0 +1,211 @@
+From b18dfd424a1595f0d4cfb85352c1d15848e6b0d9 Mon Sep 17 00:00:00 2001
+From: George Popescu <georgepope@google.com>
+Date: Mon, 17 Aug 2020 09:23:35 +0000
+Subject: [PATCH 04/12] KVM: ARM64: Add a buffer that can pass UBSAN data from
+ EL2 to EL1.
+
+The data, which is collected from UBSAN handlers that lives at EL2, is
+stored into this circular buffer.
+This buffer stores only UBSAN data because it should not be preoccupied
+by other mechanisms data structures and functionalities.
+Also, for the moment the buffer is mapped inside .bss, where both EL1 and EL2
+have Read/Write rights, but in the future this will change and EL1 will not
+be able to acess EL2's .bss. At that point the buffer will only need to be
+mapped in order for this to work.
+
+Signed-off-by: George Popescu <georgepope@google.com>
+---
+ arch/arm64/include/asm/kvm_ubsan.h  | 14 +++++
+ arch/arm64/kvm/Makefile             |  2 +
+ arch/arm64/kvm/arm.c                |  9 +++-
+ arch/arm64/kvm/hyp/nvhe/kvm_ubsan.c | 25 +++++++++
+ arch/arm64/kvm/kvm_ubsan_buffer.c   | 80 +++++++++++++++++++++++++++++
+ 5 files changed, 129 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/include/asm/kvm_ubsan.h
+ create mode 100644 arch/arm64/kvm/kvm_ubsan_buffer.c
+
+diff --git a/arch/arm64/include/asm/kvm_ubsan.h b/arch/arm64/include/asm/kvm_ubsan.h
+new file mode 100644
+index 000000000000..d2432ba76417
+--- /dev/null
++++ b/arch/arm64/include/asm/kvm_ubsan.h
+@@ -0,0 +1,14 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Copyright 2020 Google LLC
++ * Author: George Popescu <georgepope@google.com>
++ */
++ 
++#include <ubsan.h>
++
++#define UBSAN_MAX_TYPE 6
++#define KVM_UBSAN_BUFFER_SIZE 1000
++
++struct kvm_ubsan_info {
++    int type;
++};
+diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+index 1504c81fbf5d..39372507843e 100644
+--- a/arch/arm64/kvm/Makefile
++++ b/arch/arm64/kvm/Makefile
+@@ -4,6 +4,7 @@
+ #
+ 
+ ccflags-y += -I $(srctree)/$(src)
++CFLAGS_kvm_ubsan_buffer.o += -I $(srctree)/lib/
+ 
+ KVM=../../../virt/kvm
+ 
+@@ -24,4 +25,5 @@ kvm-y := $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o \
+ 	 vgic/vgic-mmio-v3.o vgic/vgic-kvm-device.o \
+ 	 vgic/vgic-its.o vgic/vgic-debug.o
+ 
++kvm-$(CONFIG_UBSAN) += kvm_ubsan_buffer.o
+ kvm-$(CONFIG_KVM_ARM_PMU)  += pmu-emul.o
+diff --git a/arch/arm64/kvm/arm.c b/arch/arm64/kvm/arm.c
+index defd55e6f5dc..976b4ed98745 100644
+--- a/arch/arm64/kvm/arm.c
++++ b/arch/arm64/kvm/arm.c
+@@ -1604,7 +1604,14 @@ static int init_hyp_mode(void)
+ 		kvm_err("Cannot map bss section\n");
+ 		goto out_err;
+ 	}
+-
++#ifdef CONFIG_UBSAN
++	/* required by ubsan to access the handlers structures fields */
++	err = create_hyp_mappings(kvm_ksym_ref(_data),
++				  kvm_ksym_ref(__end_once), PAGE_HYP_RO);
++	if (err) {
++		kvm_err("Cannot map data section\n");
++	}
++#endif
+ 	err = kvm_map_vectors();
+ 	if (err) {
+ 		kvm_err("Cannot map vectors\n");
+diff --git a/arch/arm64/kvm/hyp/nvhe/kvm_ubsan.c b/arch/arm64/kvm/hyp/nvhe/kvm_ubsan.c
+index b723c429c6ac..501bd419fb29 100644
+--- a/arch/arm64/kvm/hyp/nvhe/kvm_ubsan.c
++++ b/arch/arm64/kvm/hyp/nvhe/kvm_ubsan.c
+@@ -3,8 +3,33 @@
+  * Copyright 2020 Google LLC
+  * Author: George Popescu <georgepope@google.com>
+  */
++#include <linux/bitops.h>
++#include <linux/ctype.h>
++#include <linux/types.h>
++#include <linux/percpu-defs.h>
++#include <linux/kvm_host.h>
++#include <asm/kvm_arm.h>
++#include <asm/kvm_asm.h>
++#include <asm/kvm_ubsan.h>
++#include <asm/kvm_debug_buffer.h>
++#include <kvm/arm_pmu.h>
+ #include <ubsan.h>
+ 
++DEFINE_KVM_DEBUG_BUFFER(struct kvm_ubsan_info, kvm_ubsan_buffer,
++                kvm_ubsan_buff_wr_ind, KVM_UBSAN_BUFFER_SIZE);
++            
++static inline struct kvm_ubsan_info *kvm_ubsan_buffer_next_slot(void)
++{
++	struct kvm_ubsan_info *res = NULL;
++	unsigned long write_ind = __this_cpu_read(kvm_ubsan_buff_wr_ind);
++	unsigned long current_pos = write_ind % KVM_UBSAN_BUFFER_SIZE;
++
++	res = this_cpu_ptr(&kvm_ubsan_buffer[current_pos]);
++	++write_ind;
++	__this_cpu_write(kvm_ubsan_buff_wr_ind, write_ind);
++	return res;
++}
++
+ void __ubsan_handle_add_overflow(void *_data, void *lhs, void *rhs) {}
+ 
+ void __ubsan_handle_sub_overflow(void *_data, void *lhs, void *rhs){}
+diff --git a/arch/arm64/kvm/kvm_ubsan_buffer.c b/arch/arm64/kvm/kvm_ubsan_buffer.c
+new file mode 100644
+index 000000000000..12774c5d8bd7
+--- /dev/null
++++ b/arch/arm64/kvm/kvm_ubsan_buffer.c
+@@ -0,0 +1,80 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Copyright 2020 Google LLC
++ * Author: George Popescu <georgepope@google.com>
++ */
++
++#include <linux/ctype.h>
++#include <linux/types.h>
++#include <asm/kvm_debug_buffer.h>
++#include <asm/kvm_arm.h>
++#include <asm/kvm_asm.h>
++#include <kvm/arm_pmu.h>
++
++#include <ubsan.h>
++#include <asm/kvm_ubsan.h>
++
++DECLARE_KVM_DEBUG_BUFFER(struct kvm_ubsan_info, kvm_ubsan_buffer, 
++		kvm_ubsan_buff_wr_ind, kvm_ubsan_buff_rd_ind,
++		kvm_ubsan_buff_laps_did, KVM_UBSAN_BUFFER_SIZE);
++
++
++void iterate_kvm_ubsan_buffer(int left, int right, unsigned long *nr_slots) {
++	unsigned int i;
++	unsigned int *limit;
++	struct kvm_ubsan_info *slot;
++	slot = (struct kvm_ubsan_info *) this_cpu_ptr_nvhe(kvm_ubsan_buffer);
++	for (i = left; i <= right && *nr_slots > 0; ++i, --*nr_slots) {
++		/* check ubsan data */
++		/* clear the slot */
++		slot[i].type = 0;
++	}
++}
++
++void __kvm_check_ubsan_buffer(void)
++{
++	unsigned int ind, curr_lap, left, right;
++	unsigned long *write_ind, *read_ind, *laps_did;
++	unsigned long nr_slots;
++
++	write_ind = (unsigned long *) this_cpu_ptr_nvhe(kvm_ubsan_buff_wr_ind);
++	read_ind = this_cpu_ptr(&kvm_ubsan_buff_rd_ind);
++	nr_slots =  *write_ind - *read_ind;
++	if (nr_slots > KVM_UBSAN_BUFFER_SIZE) {
++		pr_err("The capacity is exceeded, suggested size is: %ld",
++				nr_slots);
++		nr_slots = KVM_UBSAN_BUFFER_SIZE;
++	}
++	/* Because this is a circular buffer and it's wanted to  print the
++	logs in the same order as they were stored, there are two cases:
++	The Happy case:
++		The write index didn't take a lap:
++			Read from: -> read_index -> End
++				   -> Start -> write_index
++			As long as you've got slots to read from
++	The Bad case:
++		The write index  took at least one lap:
++			Read from -> write_index + 1 -> End
++				  -> Start -> write_index - 1
++	In both cases it is required to read from one point to End
++	and from Start to the same point.
++	*/
++	curr_lap = (nr_slots - 1) / KVM_UBSAN_BUFFER_SIZE;
++	laps_did =  this_cpu_ptr(&kvm_ubsan_buff_laps_did);
++	if (curr_lap - *laps_did < 1) {
++		left = *read_ind % KVM_UBSAN_BUFFER_SIZE;
++		right = (*write_ind - 1) % KVM_UBSAN_BUFFER_SIZE;
++	} else {
++		left = (*write_ind + 1) % KVM_UBSAN_BUFFER_SIZE;
++		right = (*write_ind - 1) % KVM_UBSAN_BUFFER_SIZE;
++	}
++	ind = kvm_ubsan_buff_rd_ind % KVM_UBSAN_BUFFER_SIZE;
++	/* iterate from Left -> End */
++	iterate_kvm_ubsan_buffer(left, KVM_UBSAN_BUFFER_SIZE - 1, &nr_slots);
++	/* iterate from Start -> Right */
++	iterate_kvm_ubsan_buffer(0, right, &nr_slots);
++
++	*read_ind =  *write_ind;
++	*laps_did = curr_lap;
++}
++
+-- 
+2.28.0.220.ged08abb693-goog
+
