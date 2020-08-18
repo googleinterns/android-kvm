@@ -8,10 +8,11 @@ ccflags-y := -D__KVM_NVHE_HYPERVISOR__
 CFLAGS_kvm_ubsan.hyp.tmp.o += -I $(srctree)/lib/
 
 obj-y := timer-sr.o sysreg-sr.o debug-sr.o switch.o tlb.o hyp-init.o \
-	 hyp-start.o hyp-main.o
+	 hyp-start.o hyp-main.o 
 obj-y += ../vgic-v3-sr.o ../aarch32.o ../vgic-v2-cpuif-proxy.o ../entry.o \
 	 ../fpsimd.o ../hyp-entry.o
 
+obj-$(CONFIG_KCOV) += kvm_kcov.o
 obj-$(CONFIG_UBSAN) += kvm_ubsan.o
 obj-y := $(patsubst %.o,%.hyp.o,$(obj-y))
 extra-y := $(patsubst %.hyp.o,%.hyp.tmp.o,$(obj-y))
@@ -59,7 +60,7 @@ KBUILD_CFLAGS := $(filter-out $(CC_FLAGS_FTRACE) $(CC_FLAGS_SCS), $(KBUILD_CFLAG
 # cause crashes. Just disable it.
 GCOV_PROFILE	:= n
 KASAN_SANITIZE	:= n
-KCOV_INSTRUMENT	:= n
+KCOV_INSTRUMENT	:= y
 
 # Skip objtool checking for this directory because nVHE code is compiled with
 # non-standard build rules.
