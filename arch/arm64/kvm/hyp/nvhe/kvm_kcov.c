@@ -4,6 +4,8 @@
  * Author: George Popescu <georgepope@google.com>
  */
 
+#include <linux/ctype.h>
+#include <linux/types.h>
 #include <linux/preempt.h>
 #include <linux/compiler.h>
 #include <linux/kcov.h>
@@ -11,76 +13,34 @@
 #include <asm/kvm_debug_buffer.h>
 #include <asm/kvm_mmu.h>
 #include <asm/kvm_hyp.h>
+#include <asm/kvm_kcov.h>
 #include <../debug-pl011.h>
 
 #define KVM_KCOV_BUFFER_SIZE 1000
 
-struct kcov {
-	/*
-	 * Reference counter. We keep one for:
-	 *  - opened file descriptor
-	 *  - task with enabled coverage (we can't unwire it from another task)
-	 *  - each code section for remote coverage collection
-	 */
-	refcount_t		refcount;
-	/* The lock protects mode, size, area and t. */
-	spinlock_t		lock;
-	enum kcov_mode		mode;
-	/* Size of arena (in long's). */
-	unsigned int		size;
-	/* Coverage buffer shared with user space. */
-	void			*area;
-	/* Task for which we collect coverage, or NULL. */
-	struct task_struct	*t;
-	/* Collecting coverage from remote (background) threads. */
-	bool			remote;
-	/* Size of remote area (in long's). */
-	unsigned int		remote_size;
-	/*
-	 * Sequence is incremented each time kcov is reenabled, used by
-	 * kcov_remote_stop(), see the comment there.
-	 */
-	int			sequence;
-};
-struct kvm_kcov_info {
-        struct kcov kcov_struct;
-};
-
-DEFINE_KVM_DEBUG_BUFFER(struct kvm_kcov_info, kvm_kcvo_buffer,
+DEFINE_KVM_DEBUG_BUFFER(struct kvm_kcov_info, kvm_kcov_buffer,
                 kvm_kcov_buff_wr_ind, KVM_KCOV_BUFFER_SIZE);
 
-static bool check_kcov_mode(enum kcov_mode needed_mode, struct task_struct *t)
+static inline struct kvm_kcov_info *kvm_kcov_buffer_next_slot(void)
 {
-	unsigned int mode;
-        /* since interrupts aren't enabled inside EL2 for the moment
-		this check isn't needed 
-		*/
-        return 1;
-	/*
-	 * We are interested in code coverage as a function of a syscall inputs,
-	 * so we ignore code executed in interrupts, unless we are in a remote
-	 * coverage collection section in a softirq.
-	
-	if (!in_task() && !(in_serving_softirq() && t->kcov_softirq))
-		return false;
-	mode = READ_ONCE(t->kcov_mode);
+	struct kvm_kcov_info *res = NULL;
+	unsigned long write_ind = __this_cpu_read(kvm_kcov_buff_wr_ind);
+	unsigned long current_pos = write_ind % KVM_KCOV_BUFFER_SIZE;
 
-	 * There is some code that runs in interrupts but for which
-	 * in_interrupt() returns false (e.g. preempt_schedule_irq()).
-	 * READ_ONCE()/barrier() effectively provides load-acquire wrt
-	 * interrupts, there are paired barrier()/WRITE_ONCE() in
-	 * kcov_start().
-	
-	barrier();
-	return mode == needed_mode;
-         */
+	res = this_cpu_ptr(&kvm_kcov_buffer[current_pos]);
+	++write_ind;
+	__this_cpu_write(kvm_kcov_buff_wr_ind, write_ind);
+	return res;
 }
 
-static unsigned long canonicalize_ip(unsigned long ip)
+static notrace unsigned long canonicalize_ip(unsigned long ip)
 {
         /* need to use the HYP->KERN va too */
+	/* enable/disable RANDOMIZATION to test that*/
+	//hyp_putx64(ip);
 #ifdef CONFIG_RANDOMIZE_BASE
-	ip -= kaslr_offset();
+	u64 kaslr_off = kimage_vaddr - KIMAGE_VADDR;
+	ip -= kaslr_off;
 #endif
 	return ip;
 }
@@ -89,21 +49,105 @@ static unsigned long canonicalize_ip(unsigned long ip)
  * Entry point from instrumented code. inside EL2
  * This is called once per basic-block/edge.
  */
-void  __sanitizer_cov_trace_pc(void)
+#define __nvhe_undefined_symbol __kvm_hyp_vector
+
+void notrace __sanitizer_cov_trace_pc(void)
 {
-	struct task_struct *t;
-	unsigned long *area;
-	//unsigned long ip = canonicalize_ip(_RET_IP_);
-	unsigned long pos;
-        // whenever it returns from the hvc call, the state returns to the same process
-        // as it entered
-        /* move this part to EL1
-           write the PC to the buffer
-	area = t->kcov_area;
-	pos = READ_ONCE(area[0]) + 1;
-	if (likely(pos < t->kcov_size)) {
-		area[pos] = ip;
-		WRITE_ONCE(area[0], pos);
-	}
-        */
+	unsigned long ip = canonicalize_ip(_RET_IP_);
+	struct kvm_kcov_info *slot;
+	hyp_putx64(hyp_symbol_addr(__kvm_hyp_vector));
+	hyp_putx64(kvm_ksym_ref(__kvm_hyp_vector));
+	slot = kvm_kcov_buffer_next_slot();
+	slot->ip = ip;
+	slot->type = KCOV_MODE_TRACE_PC;
 }
+
+#ifdef CONFIG_KCOV_ENABLE_COMPARISONS
+static void notrace write_comp_data(u64 type, u64 arg1, u64 arg2, u64 ip)
+{
+	struct kvm_kcov_info *slot;
+
+	ip = canonicalize_ip(ip);
+	slot = kvm_kcov_buffer_next_slot();
+	/*
+	 * We write all comparison arguments and types as u64.
+	 * The buffer was allocated for t->kcov_size unsigned longs.
+	 */
+	 slot->comp_data.type = type;
+	 slot->comp_data.arg1 = arg1;
+	 slot->comp_data.arg2 = arg2;
+	 slot->ip = ip;
+	 slot->type = KCOV_MODE_TRACE_CMP;
+}
+
+void notrace __sanitizer_cov_trace_cmp1(u8 arg1, u8 arg2)
+{
+	write_comp_data(KCOV_CMP_SIZE(0), arg1, arg2, _RET_IP_);
+}
+
+void notrace __sanitizer_cov_trace_cmp2(u16 arg1, u16 arg2)
+{
+	write_comp_data(KCOV_CMP_SIZE(1), arg1, arg2, _RET_IP_);
+}
+
+void notrace __sanitizer_cov_trace_cmp4(u32 arg1, u32 arg2)
+{
+	write_comp_data(KCOV_CMP_SIZE(2), arg1, arg2, _RET_IP_);
+}
+
+void notrace __sanitizer_cov_trace_cmp8(u64 arg1, u64 arg2)
+{
+	write_comp_data(KCOV_CMP_SIZE(3), arg1, arg2, _RET_IP_);
+}
+
+void notrace __sanitizer_cov_trace_const_cmp1(u8 arg1, u8 arg2)
+{
+	write_comp_data(KCOV_CMP_SIZE(0) | KCOV_CMP_CONST, arg1, arg2,
+			_RET_IP_);
+}
+
+void notrace __sanitizer_cov_trace_const_cmp2(u16 arg1, u16 arg2)
+{
+	write_comp_data(KCOV_CMP_SIZE(1) | KCOV_CMP_CONST, arg1, arg2,
+			_RET_IP_);
+}
+
+void notrace __sanitizer_cov_trace_const_cmp4(u32 arg1, u32 arg2)
+{
+	write_comp_data(KCOV_CMP_SIZE(2) | KCOV_CMP_CONST, arg1, arg2,
+			_RET_IP_);
+}
+
+void notrace __sanitizer_cov_trace_const_cmp8(u64 arg1, u64 arg2)
+{
+	write_comp_data(KCOV_CMP_SIZE(3) | KCOV_CMP_CONST, arg1, arg2,
+			_RET_IP_);
+}
+
+void notrace __sanitizer_cov_trace_switch(u64 val, u64 *cases)
+{
+	u64 i;
+	u64 count = cases[0];
+	u64 size = cases[1];
+	u64 type = KCOV_CMP_CONST;
+
+	switch (size) {
+	case 8:
+		type |= KCOV_CMP_SIZE(0);
+		break;
+	case 16:
+		type |= KCOV_CMP_SIZE(1);
+		break;
+	case 32:
+		type |= KCOV_CMP_SIZE(2);
+		break;
+	case 64:
+		type |= KCOV_CMP_SIZE(3);
+		break;
+	default:
+		return;
+	}
+	for (i = 0; i < count; i++)
+		write_comp_data(type, cases[i + 2], val, _RET_IP_);
+}
+#endif /* ifdef CONFIG_KCOV_ENABLE_COMPARISONS */

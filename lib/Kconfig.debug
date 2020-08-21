@@ -1831,6 +1831,7 @@ config FAULT_INJECTION_STACKTRACE_FILTER
 
 config ARCH_HAS_KCOV
 	bool
+	default y
 	help
 	  An architecture should select this when it can successfully
 	  build and run with CONFIG_KCOV. This typically requires
@@ -1860,6 +1861,7 @@ config KCOV
 config KCOV_ENABLE_COMPARISONS
 	bool "Enable comparison operands collection by KCOV"
 	depends on KCOV
+	default y
 	depends on $(cc-option,-fsanitize-coverage=trace-cmp)
 	help
 	  KCOV also exposes operands of every comparison in the instrumented
