@@ -244,6 +244,7 @@ extern void __kvm_check_kcov_buffer(void);
 static inline void __kvm_check_kcov_buffer(void) {}
 #endif
 
+#ifdef CONFIG_KVM_ARM_DEBUG_BUFFER
 void __kvm_arm_check_debug_buffer() {
 	if (IS_ENABLED(CONFIG_UBSAN)) {
 		__kvm_check_ubsan_buffer();
@@ -252,3 +253,4 @@ void __kvm_arm_check_debug_buffer() {
 		__kvm_check_kcov_buffer();
 	}
 }
+#endif

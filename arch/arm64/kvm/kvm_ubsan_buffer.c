@@ -63,8 +63,8 @@ void __kvm_check_ubsan_data(struct kvm_ubsan_info *slot)
 
 void iterate_kvm_ubsan_buffer(int left, int right, unsigned long *nr_slots) {
 	unsigned int i;
-	unsigned int *limit;
 	struct kvm_ubsan_info *slot;
+	
 	slot = (struct kvm_ubsan_info *) this_cpu_ptr_nvhe(kvm_ubsan_buffer);
 	for (i = left; i <= right && *nr_slots > 0; ++i, --*nr_slots) {
 		__kvm_check_ubsan_data(slot + i);
