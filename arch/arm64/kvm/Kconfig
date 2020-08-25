@@ -59,7 +59,7 @@ config KVM_ARM_PMU
 
 config KVM_ARM_HYP_DEBUG_UART
 	bool "Hack up some basic UART functionality at EL2"
-	default y
+	default n
 
 config KVM_ARM_HYP_DEBUG_UART_ADDR
 	hex "Physical address of the PL011 for EL2 to use"

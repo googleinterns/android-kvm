@@ -1,4 +1,8 @@
-
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright 2020 Google LLC
+ * Author: George Popescu <georgepope@google.com>
+ */
 
 #include <asm/kvm_kcov.h>
 #include <asm/kvm_debug_buffer.h>
@@ -21,7 +25,7 @@ static notrace bool check_kcov_mode(struct kvm_kcov_info *slot, enum kcov_mode n
 	if (!in_task() && !(in_serving_softirq() && t->kcov_softirq))
 		return false;
 	
-	mode = READ_ONCE(t->kcov_mode);
+	// mode = READ_ONCE(t->kcov_mode);
 	/*
 	 * There is some code that runs in interrupts but for which
 	 * in_interrupt() returns false (e.g. preempt_schedule_irq()).
@@ -29,7 +33,7 @@ static notrace bool check_kcov_mode(struct kvm_kcov_info *slot, enum kcov_mode n
 	 * interrupts, there are paired barrier()/WRITE_ONCE() in
 	 * kcov_start().
 	 */
-	 barrier();
+	// barrier();
 	
 	return (mode == needed_mode && slot->type == needed_mode);
 }
@@ -84,7 +88,7 @@ void iterate_kvm_kcov_buffer(int left, int right, unsigned long *nr_slots) {
 	}
 }
 
-void __kvm_check_kcov_buffer() {
+void __kvm_check_kcov_buffer(void) {
 	struct kvm_debug_buffer_ind crt;
 	unsigned long *write_ind, *read_ind, *laps;
 
