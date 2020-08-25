@@ -42,12 +42,12 @@ void __kvm_check_kcov_data(struct kvm_kcov_info *slot) {
 
 	t = current;
 	area = t->kcov_area;
-	/*
-	if (slot->type == KCOV_MODE_TRACE_CMP) {
-		printk("%lx %lx %lx %lx\n",slot->comp_data.type, slot->comp_data.arg1, slot->comp_data.arg2, slot->ip);
-	}
-	printk("kcov check data");*/
-	printk("%lx", (uintptr_t)kvm_ksym_ref(__kvm_hyp_vector));
+
+	#ifdef CONFIG_RANDOMIZE_BASE
+	slot->ip -= kaslr_offset();
+	#endif
+	printk("the ip is: %lx", slot->ip);
+	
 	if (check_kcov_mode(slot, KCOV_MODE_TRACE_PC, t)) {
 		/* The first 64-bit word is the number of subsequent PCs. */
 		pos = READ_ONCE(area[0]) + 1;

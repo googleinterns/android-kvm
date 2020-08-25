@@ -14,6 +14,8 @@
 #include <asm/kvm_mmu.h>
 #include <asm/kvm_hyp.h>
 #include <asm/kvm_kcov.h>
+
+#include <hyp/switch.h>
 #include <../debug-pl011.h>
 
 #define KVM_KCOV_BUFFER_SIZE 1000
@@ -33,15 +35,19 @@ static inline struct kvm_kcov_info *kvm_kcov_buffer_next_slot(void)
 	return res;
 }
 
-static notrace unsigned long canonicalize_ip(unsigned long ip)
+#define __nvhe_undefined_symbol __kvm_hyp_vector
+
+static notrace unsigned long hyp_kern_va(unsigned long ip)
 {
-        /* need to use the HYP->KERN va too */
 	/* enable/disable RANDOMIZATION to test that*/
-	//hyp_putx64(ip);
-#ifdef CONFIG_RANDOMIZE_BASE
-	u64 kaslr_off = kimage_vaddr - KIMAGE_VADDR;
-	ip -= kaslr_off;
-#endif
+	unsigned long kern_va;
+	// asm volatile("ldr %0, =%1" : "=r" (kern_va) : "S" (__kvm_hyp_init));
+	// unsigned long offset = (unsigned long) __kvm_hyp_init - kern_va;
+	// asm volatile("ldr %0, =%1" : "=r" (kern_va) : "S" (__kvm_hyp_vector));
+	// unsigned long offset = (unsigned long) __kvm_hyp_vector - kern_va;
+	asm volatile("ldr %0, =%1" : "=r" (kern_va) : "S" (__hyp_panic_string));
+	unsigned long offset = (unsigned long) __hyp_panic_string - kern_va;
+	ip -= offset;
 	return ip;
 }
 
@@ -49,14 +55,12 @@ static notrace unsigned long canonicalize_ip(unsigned long ip)
  * Entry point from instrumented code. inside EL2
  * This is called once per basic-block/edge.
  */
-#define __nvhe_undefined_symbol __kvm_hyp_vector
 
 void notrace __sanitizer_cov_trace_pc(void)
 {
-	unsigned long ip = canonicalize_ip(_RET_IP_);
+	unsigned long ip = hyp_kern_va(_RET_IP_);
 	struct kvm_kcov_info *slot;
-	hyp_putx64(hyp_symbol_addr(__kvm_hyp_vector));
-	hyp_putx64(kvm_ksym_ref(__kvm_hyp_vector));
+	
 	slot = kvm_kcov_buffer_next_slot();
 	slot->ip = ip;
 	slot->type = KCOV_MODE_TRACE_PC;
@@ -67,7 +71,7 @@ static void notrace write_comp_data(u64 type, u64 arg1, u64 arg2, u64 ip)
 {
 	struct kvm_kcov_info *slot;
 
-	ip = canonicalize_ip(ip);
+	ip = hyp_kern_va(ip);
 	slot = kvm_kcov_buffer_next_slot();
 	/*
 	 * We write all comparison arguments and types as u64.

@@ -107,8 +107,6 @@ KVM_NVHE_ALIAS(kvm_hyp_debug_uart_set_basep);
 
 #ifdef CONFIG_KCOV
 KVM_NVHE_ALIAS(vabits_actual);
-KVM_NVHE_ALIAS(kimage_vaddr);
-KVM_NVHE_ALIAS(physvirt_offset);
 #endif /* CONFIG_KCOV */
 
 #endif /* CONFIG_KVM */
