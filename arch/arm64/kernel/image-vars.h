@@ -96,10 +96,44 @@ KVM_NVHE_ALIAS(cpu_hwcaps);
 KVM_NVHE_ALIAS(vgic_v2_cpuif_trap);
 KVM_NVHE_ALIAS(vgic_v3_cpuif_trap);
 
+/* KVM EL2 vector base address */
+KVM_NVHE_ALIAS(__kvm_bp_vect_base);
+
 /* Static key checked in pmr_sync(). */
 #ifdef CONFIG_ARM64_PSEUDO_NMI
 KVM_NVHE_ALIAS(gic_pmr_sync);
 #endif
+
+/* Position-independent library routines */
+__kvm_nvhe_clear_page			= __kvm_nvhe___pi_clear_page;
+__kvm_nvhe_copy_page			= __kvm_nvhe___pi_copy_page;
+__kvm_nvhe_memcpy			= __kvm_nvhe___pi_memcpy;
+__kvm_nvhe_memset			= __kvm_nvhe___pi_memset;
+
+#ifdef CONFIG_KASAN
+__kvm_nvhe___memcpy			= __kvm_nvhe___pi_memcpy;
+__kvm_nvhe___memset			= __kvm_nvhe___pi_memset;
+#endif
+
+/* Hyp vector PA */
+KVM_NVHE_ALIAS(__kvm_bp_vect_base);
+
+/* Hypevisor VA size */
+KVM_NVHE_ALIAS(hyp_va_bits);
+
+/* Kernel memory sections */
+KVM_NVHE_ALIAS(__start_rodata);
+KVM_NVHE_ALIAS(__end_rodata);
+KVM_NVHE_ALIAS(__bss_start);
+KVM_NVHE_ALIAS(__bss_stop);
+
+/* Hyp memory sections */
+KVM_NVHE_ALIAS(__hyp_idmap_text_start);
+KVM_NVHE_ALIAS(__hyp_idmap_text_end);
+KVM_NVHE_ALIAS(__hyp_text_start);
+KVM_NVHE_ALIAS(__hyp_text_end);
+KVM_NVHE_ALIAS(__hyp_bss_start);
+KVM_NVHE_ALIAS(__hyp_bss_end);
 
 #ifdef CONFIG_KVM_ARM_HYP_DEBUG_UART
 KVM_NVHE_ALIAS(kvm_hyp_debug_uart_set_basep);

@@ -31,6 +31,8 @@ static inline struct kvm_cpu_context *get_hyp_ctxt(void)
 #endif
 }
 
+#define __hyp_bss __section(.hyp.bss)
+
 #define read_sysreg_elx(r,nvh,vh)					\
 	({								\
 		u64 reg;						\
@@ -117,6 +119,14 @@ void __handle_sei(void);
 void __noreturn hyp_panic(void);
 #ifdef __KVM_NVHE_HYPERVISOR__
 void __noreturn __hyp_do_panic(unsigned long, ...);
+#endif
+
+#ifdef __KVM_NVHE_HYPERVISOR__
+void __kvm_init_switch_pgd(phys_addr_t phys, unsigned long size,
+			   phys_addr_t pgd, void *sp, void *cont_fn);
+int __kvm_hyp_setup(phys_addr_t phys, void* virt, unsigned long size,
+		    phys_addr_t bp_vect_pa, unsigned long nr_cpus,
+		    phys_addr_t *per_cpu_base);
 #endif
 
 #endif /* __ARM64_KVM_HYP_H__ */

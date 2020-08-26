@@ -6,10 +6,14 @@
 asflags-y := -D__KVM_NVHE_HYPERVISOR__
 ccflags-y := -D__KVM_NVHE_HYPERVISOR__
 
+lib-objs := clear_page.o copy_page.o memcpy.o memset.o
+lib-objs := $(addprefix ../../../lib/, $(lib-objs))
+
 obj-y := timer-sr.o sysreg-sr.o debug-sr.o switch.o tlb.o hyp-init.o \
-	 hyp-start.o hyp-main.o
+	 hyp-start.o hyp-main.o early_alloc.o page_alloc.o setup.o mm.o
 obj-y += ../vgic-v3-sr.o ../aarch32.o ../vgic-v2-cpuif-proxy.o ../entry.o \
-	 ../fpsimd.o ../hyp-entry.o
+	 ../fpsimd.o ../hyp-entry.o ../pgtable.o
+obj-y += $(lib-objs)
 
 obj-y := $(patsubst %.o,%.hyp.o,$(obj-y))
 extra-y := $(patsubst %.hyp.o,%.hyp.tmp.o,$(obj-y))
@@ -42,11 +46,24 @@ quiet_cmd_hypcopy = HYPCOPY $@
 		echo "$@: function reordering not supported in nVHE hyp code" >&2; \
 		/bin/false;						\
 	fi;								\
-	$(OBJCOPY) --prefix-symbols=__kvm_nvhe_				\
-		   --rename-section=.text=.hyp.text			\
-		   --rename-section=.data..percpu=.hyp.data..percpu	\
-		   --rename-section=.data..percpu..read_mostly=.hyp.data..percpu..read_mostly \
-		   $< $@
+      $(OBJCOPY)	--prefix-symbols=__kvm_nvhe_			\
+			--remove-section=!.text				\
+			--rename-section=.text=.hyp.text		\
+			--remove-section=!.bss				\
+			--rename-section=.bss=.hyp.bss			\
+			--remove-section=!.data..percpu		\
+			--rename-section=.data..percpu=.hyp.data..percpu \
+			--remove-section=!.data..percpu..read_mostly	\
+			--rename-section=.data..percpu..read_mostly=.hyp.data..percpu..read_mostly \
+			--remove-section=!.hyp.*			\
+			--remove-section=!.altinst*			\
+			--remove-section=!.rodata*			\
+			--remove-section=!.rela*			\
+			--remove-section=!.shstrtab			\
+			--remove-section=!.strtab			\
+			--remove-section=!.symtab			\
+			--remove-section=.*				\
+			$< $@
 
 # Remove ftrace and Shadow Call Stack CFLAGS.
 # This is equivalent to the 'notrace' and '__noscs' annotations.
