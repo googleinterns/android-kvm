@@ -5,6 +5,7 @@
  */
 
 #include <linux/linkage.h>
+#include <asm/kvm_debug_buffer.h>
 
 #include <asm/alternative.h>
 #include <asm/assembler.h>

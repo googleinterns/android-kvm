@@ -11,7 +11,6 @@
 #include <asm/kvm_asm.h>
 #include <kvm/arm_pmu.h>
 
-#include <ubsan.h>
 #include <asm/kvm_ubsan.h>
 
 DECLARE_KVM_DEBUG_BUFFER(struct kvm_ubsan_info, kvm_ubsan_buffer,

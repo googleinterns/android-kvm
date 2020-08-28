@@ -3,7 +3,6 @@
  * Copyright 2020 Google LLC
  * Author: George Popescu <georgepope@google.com>
  */
-
 #include <linux/percpu-defs.h>
 
 #define KVM_DEBUG_BUFFER_SIZE 1000

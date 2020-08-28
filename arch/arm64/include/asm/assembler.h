@@ -266,7 +266,6 @@ alternative_endif
 	adr_this_cpu \tmp1, \sym, \tmp2
 	str \reg, [\tmp1]
 	.endm
-
 /*
  * vma_vm_mm - get mm pointer from vma pointer (vma->vm_mm)
  */
