@@ -113,7 +113,7 @@ SYM_INNER_LABEL(__guest_exit, SYM_L_GLOBAL)
 
 	// Store the guest's sp_el0
 	save_sp_el0	x1, x2
-
+	
 	/* if entering the host clear the buffers */
 	/* this code stays here provisory */
 #ifdef __KVM_NVHE_HYPERVISOR__
