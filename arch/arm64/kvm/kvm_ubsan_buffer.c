@@ -70,7 +70,7 @@ void iterate_kvm_ubsan_buffer(int left, int right, unsigned long *nr_slots)
 	for (i = left; i <= right && *nr_slots > 0; ++i, --*nr_slots) {
 		__kvm_check_ubsan_data(slot + i);
 		/* clear the slot */
-		slot[i].type = 0;
+		slot[i].type = -1;
 	}
 }
 
@@ -78,14 +78,12 @@ void __kvm_check_ubsan_buffer(void)
 {
 	struct kvm_debug_buffer_ind crt;
 	unsigned long *write_ind, *read_ind, *laps;
-
 	write_ind = (unsigned long *) this_cpu_ptr_nvhe(kvm_ubsan_buff_wr_ind);
 	read_ind = this_cpu_ptr(&kvm_ubsan_buff_rd_ind);
 	laps = this_cpu_ptr(&kvm_ubsan_buff_laps);
 	crt = kvm_debug_buffer_get_ind(write_ind, read_ind, laps, KVM_UBSAN_BUFFER_SIZE);
-	/* iterate from Right -> End */
-	iterate_kvm_ubsan_buffer(crt.read, KVM_UBSAN_BUFFER_SIZE - 1,
-			&crt.nr_slots);
-	/* iterate from Start -> Left */
+	/* iterate from Read -> End */
+	iterate_kvm_ubsan_buffer(crt.read, KVM_UBSAN_BUFFER_SIZE - 1, &crt.nr_slots);
+	/* iterate from Start -> Write */
 	iterate_kvm_ubsan_buffer(0, crt.write, &crt.nr_slots);
 }

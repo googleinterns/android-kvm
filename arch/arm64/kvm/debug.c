@@ -233,9 +233,9 @@ void kvm_arm_clear_debug(struct kvm_vcpu *vcpu)
 }
 
 #ifdef CONFIG_UBSAN
-extern void __kvm_check_ubsan_buffer(void);
+extern void  __kvm_check_ubsan_buffer(void);
 #else
-static inline void __kvm_check_ubsan_buffer(void) {}
+static inline void  __kvm_check_ubsan_buffer(void) {}
 #endif
 
 #ifdef CONFIG_KVM_ARM_DEBUG_BUFFER

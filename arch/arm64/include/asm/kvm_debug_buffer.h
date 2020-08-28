@@ -47,7 +47,7 @@ The Bad case:
 	The write index  took at least one lap:
 		Read from -> write_index + 1 -> End
 			-> Start -> write_index
-In both cases it is required to read from Read to End
+In both cases it is required to read from read to End
 and from Start to Write.
 */
 static struct kvm_debug_buffer_ind kvm_debug_buffer_get_ind(unsigned long *write_ind,
@@ -55,11 +55,9 @@ static struct kvm_debug_buffer_ind kvm_debug_buffer_get_ind(unsigned long *write
 {
 	struct kvm_debug_buffer_ind res;
 	unsigned int curr_lap;
-
 	res.nr_slots =  *write_ind - *read_ind;
 	if (res.nr_slots > size) {
-		pr_err("The capacity is exceeded, suggested size is: %ld",
-				res.nr_slots);
+		pr_err("The capacity is exceeded, suggested size is: %ld", res.nr_slots);
 		res.nr_slots = size;
 	}
 

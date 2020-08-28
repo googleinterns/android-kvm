@@ -13,7 +13,8 @@
 #include <asm/kvm_ubsan.h>
 #include <asm/kvm_debug_buffer.h>
 #include <kvm/arm_pmu.h>
-#include <ubsan.h>
+#include <hyp/test_ubsan.h>
+
 
 DEFINE_KVM_DEBUG_BUFFER(struct kvm_ubsan_info, kvm_ubsan_buffer,
                 kvm_ubsan_buff_wr_ind, KVM_UBSAN_BUFFER_SIZE);
@@ -30,7 +31,7 @@ static inline struct kvm_ubsan_info *kvm_ubsan_buffer_next_slot(void)
 	return res;
 }
 
-void write_type_mismatch_data(struct type_mismatch_data_common *data, void *lval)
+static void write_type_mismatch_data(struct type_mismatch_data_common *data, void *lval)
 {
 	struct kvm_ubsan_info *slot;
 	struct type_mismatch_data *aux_cont;
@@ -53,8 +54,8 @@ void write_overflow_data(struct overflow_data *data, void *lval, void *rval, cha
 	struct kvm_ubsan_info *slot = kvm_ubsan_buffer_next_slot();
 
 	if (slot) {
-		slot->overflow_data = *data;
 		slot->type = UBSAN_OVERFLOW_DATA;
+		slot->overflow_data = *data;
 		slot->u_val.op = op;
 		slot->u_val.lval = lval;
 		if (op != '!')

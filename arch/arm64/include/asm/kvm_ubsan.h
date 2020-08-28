@@ -38,7 +38,7 @@ struct kvm_ubsan_info {
 	};
 };
 
-void __ubsan_handle_out_of_bounds(void *_data, void *index);
+void __ubsan_handle_out_of_bounds(void *_data, void *index) __attribute__ ((optnone));
 void __ubsan_handle_builtin_unreachable(void *_data);
 void __ubsan_handle_shift_out_of_bounds(void *_data, void *lhs, void *rhs);
 void __ubsan_handle_load_invalid_value(void *_data, void *val);
