@@ -12,6 +12,7 @@
 #include <asm/kvm_mmu.h>
 
 #include <kvm/arm_hypercalls.h>
+#include <hyp/test_ubsan.h>
 
 typedef __noreturn unsigned long (*stub_hvc_handler_t)
 	(unsigned long, unsigned long, unsigned long, unsigned long,
@@ -24,7 +25,6 @@ static void handle_stub_hvc(unsigned long func_id, struct kvm_vcpu *host_vcpu)
 {
 	char *stub_hvc_handler_kern_va;
 	stub_hvc_handler_t stub_hvc_handler;
-
 	/*
 	 * The handlers of the supported stub HVCs disable the MMU so they must
 	 * be called in the idmap. We compute the idmap address by subtracting
@@ -187,6 +187,9 @@ void __noreturn kvm_hyp_main(void)
 
 	/* The host is already loaded so note it as the running vcpu. */
 	*this_cpu_ptr(&kvm_hyp_running_vcpu) = host_vcpu;
+
+	if (IS_ENABLED(CONFIG_TEST_UBSAN))
+		test_ubsan();
 
 	while (true) {
 		u64 exit_code;

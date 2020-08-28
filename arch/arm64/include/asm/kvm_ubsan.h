@@ -18,6 +18,7 @@ struct ubsan_values {
 
 struct kvm_ubsan_info {
 	enum {
+		UBSAN_NONE,
 		UBSAN_OUT_OF_BOUNDS,
 		UBSAN_UNREACHABLE_DATA,
 		UBSAN_SHIFT_OUT_OF_BOUNDS,
