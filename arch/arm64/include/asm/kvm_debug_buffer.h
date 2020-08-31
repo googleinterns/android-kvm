@@ -27,7 +27,9 @@
 
 .macro clear_buffer tmp1, tmp2, tmp3
         mov \tmp1, 0
-	/* clear the buffer here */
+#ifdef CONFIG_UBSAN
+	str_this_cpu kvm_ubsan_buff_wr_ind, \tmp1, \tmp2, \tmp3
+#endif //CONFIG_UBSAN
 .endm
 
 #endif // __ASSEMBLY__
