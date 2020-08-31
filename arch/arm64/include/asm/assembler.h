@@ -256,6 +256,17 @@ alternative_endif
 	ldr	\dst, [\dst, \tmp]
 	.endm
 
+	/*
+	 * @sym: The name of the per-cpu variable
+	 * @reg: value to store
+	 * @tmp1: scratch register
+	 * @tmp2: scratch register
+	 */
+	.macro str_this_cpu sym, reg, tmp1, tmp2
+	adr_this_cpu \tmp1, \sym, \tmp2
+	str \reg, [\tmp1]
+	.endm
+
 /*
  * vma_vm_mm - get mm pointer from vma pointer (vma->vm_mm)
  */
