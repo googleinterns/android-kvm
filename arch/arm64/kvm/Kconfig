@@ -65,6 +65,9 @@ config KVM_ARM_HYP_DEBUG_UART_ADDR
 	depends on KVM_ARM_HYP_DEBUG_UART
 	default 0x09000000
 
+config KVM_ARM_DEBUG_BUFFER
+	bool "Adds a buffer that can pass data from hyp/nVHE to the kernel"
+
 config KVM_INDIRECT_VECTORS
 	def_bool HARDEN_BRANCH_PREDICTOR || RANDOMIZE_BASE
 

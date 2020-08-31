@@ -5,6 +5,7 @@
  */
 
 #include <linux/linkage.h>
+#include <asm/kvm_debug_buffer.h>
 
 #include <asm/alternative.h>
 #include <asm/assembler.h>
@@ -112,6 +113,16 @@ SYM_INNER_LABEL(__guest_exit, SYM_L_GLOBAL)
 
 	// Store the guest's sp_el0
 	save_sp_el0	x1, x2
+
+	/* if entering the host clear the buffers */
+	/* this code stays here provisory */
+#ifdef __KVM_NVHE_HYPERVISOR__
+   	mrs     x4, hcr_el2
+  	and     x4, x4, #HCR_IMO
+ 	cbz     x4, skip_buffer_clear
+        clear_buffer    x4, x5, x6  
+	skip_buffer_clear:
+#endif
 
 	get_hyp_ctxt	x2, x3
 
