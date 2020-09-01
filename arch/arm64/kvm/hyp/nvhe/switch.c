@@ -283,3 +283,8 @@ void __noreturn hyp_panic(void)
 		       read_sysreg(hpfar_el2), par, vcpu);
 	unreachable();
 }
+
+asmlinkage void kvm_unexpected_el2_exception(void)
+{
+	return __kvm_unexpected_el2_exception();
+}

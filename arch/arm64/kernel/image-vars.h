@@ -101,6 +101,10 @@ KVM_NVHE_ALIAS(vgic_v3_cpuif_trap);
 KVM_NVHE_ALIAS(gic_pmr_sync);
 #endif
 
+/* EL2 exception handling */
+KVM_NVHE_ALIAS(__start___kvm_ex_table);
+KVM_NVHE_ALIAS(__stop___kvm_ex_table);
+
 /* Position-independent library routines */
 __kvm_nvhe_clear_page			= __kvm_nvhe___pi_clear_page;
 __kvm_nvhe_copy_page			= __kvm_nvhe___pi_copy_page;
