@@ -14,6 +14,7 @@
 #include <asm/kvm_asm.h>
 #include <asm/kvm_mmu.h>
 #include <asm/mmu.h>
+#include <asm/kvm_debug_buffer.h>
 
 .macro save_caller_saved_regs_vect
 	/* x0 and x1 were saved in the vector entry */
@@ -74,6 +75,9 @@ el1_sync:				// Guest trapped into EL2
 	cmp	x0, #HVC_STUB_HCALL_NR
 	b.hs	1f
 
+#ifdef CONFIG_UBSAN
+	clear_kvm_debug_buffer kvm_ubsan_buff_wr_ind, x4, x5, x6
+#endif
 	/*
 	 * Compute the idmap address of __kvm_handle_stub_hvc and
 	 * jump there. Since we use kimage_voffset, do not use the
