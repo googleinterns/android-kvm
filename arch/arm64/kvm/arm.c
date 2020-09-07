@@ -42,8 +42,15 @@
 #include <kvm/arm_pmu.h>
 #include <kvm/arm_psci.h>
 
+#include <asm/kvm_debug_buffer.h>
+#include <asm/kvm_ubsan.h>
+
 #ifdef REQUIRES_VIRT
 __asm__(".arch_extension	virt");
+#endif
+
+#ifdef CONFIG_UBSAN
+DECLARE_KVM_DEBUG_BUFFER(struct kvm_ubsan_info, kvm_ubsan_buff, KVM_UBSAN_BUFFER_SIZE);
 #endif
 
 DEFINE_PER_CPU(kvm_host_data_t, kvm_host_data);
@@ -1519,7 +1526,15 @@ static int init_hyp_mode(void)
 		kvm_err("Cannot map bss section\n");
 		goto out_err;
 	}
-
+#ifdef CONFIG_UBSAN
+	/* required by ubsan to access the handlers structures fields */
+	err = create_hyp_mappings(kvm_ksym_ref(_data),
+				  kvm_ksym_ref(__end_once), PAGE_HYP_RO);
+	if (err) {
+		kvm_err("Cannot map data section\n");
+		goto out_err;
+	}
+#endif
 	err = kvm_map_vectors();
 	if (err) {
 		kvm_err("Cannot map vectors\n");
@@ -1551,6 +1566,27 @@ static int init_hyp_mode(void)
 			goto out_err;
 		}
 	}
+
+#ifdef CONFIG_UBSAN
+	for_each_possible_cpu(cpu) {
+		/* map the write index */
+		struct kvm_ubsan_info *buff;
+		unsigned long *wr_ind;
+
+		wr_ind = per_cpu_ptr_nvhe(kvm_ubsan_buff_wr_ind, cpu);
+		err = create_hyp_mappings(wr_ind, wr_ind + 1, PAGE_HYP);
+		if (err) {
+			kvm_err("Cannot map the busan buffer write index: %d\n", err);
+			goto out_err;
+		}
+		buff = per_cpu_ptr(kvm_nvhe_sym(kvm_ubsan_buff), cpu);
+		err = create_hyp_mappings(buff, buff + KVM_UBSAN_BUFFER_SIZE, PAGE_HYP);
+		if (err) {
+			kvm_err("Cannot map the ubsan buffer: %d\n", err);
+			goto out_err;
+		}
+	}
+#endif
 
 	err = hyp_map_aux_data();
 	if (err)

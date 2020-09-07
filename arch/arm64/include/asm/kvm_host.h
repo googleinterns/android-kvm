@@ -494,8 +494,16 @@ u64 __kvm_call_hyp(void *hypfn, ...);
 		__kvm_call_hyp(kvm_ksym_ref_nvhe(f), ##__VA_ARGS__);	\
 	})
 
+#ifdef CONFIG_UBSAN
+extern void __kvm_check_ubsan_buffer(void);
+#else
+static inline void __kvm_check_ubsan_buffer(void){}
+#endif
+
 #define __kvm_arm_check_debug_buffer()					\
 {									\
+	if (IS_ENABLED(CONFIG_UBSAN))					\
+		__kvm_check_ubsan_buffer();				\
 }
 
 /*
