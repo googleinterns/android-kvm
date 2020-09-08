@@ -1,9 +1,11 @@
 # SPDX-License-Identifier: GPL-2.0-only
 config ARCH_HAS_UBSAN_SANITIZE_ALL
 	bool
+	default y
 
 menuconfig UBSAN
 	bool "Undefined behaviour sanity checker"
+	default y
 	help
 	  This option enables the Undefined Behaviour sanity checker.
 	  Compile-time instrumentation is used to detect various undefined
@@ -39,6 +41,7 @@ config UBSAN_KCOV_BROKEN
 config UBSAN_BOUNDS
 	bool "Perform array index bounds checking"
 	default UBSAN
+	default y
 	depends on !UBSAN_KCOV_BROKEN
 	help
 	  This option enables detection of directly indexed out of bounds

@@ -1829,7 +1829,6 @@ config FAULT_INJECTION_STACKTRACE_FILTER
 
 config ARCH_HAS_KCOV
 	bool
-	default y
 	help
 	  An architecture should select this when it can successfully
 	  build and run with CONFIG_KCOV. This typically requires
@@ -1837,13 +1836,11 @@ config ARCH_HAS_KCOV
 
 config CC_HAS_SANCOV_TRACE_PC
 	def_bool $(cc-option,-fsanitize-coverage=trace-pc)
-	default y
 
 
 config KCOV
 	bool "Code coverage for fuzzing"
 	depends on ARCH_HAS_KCOV
-	default y
 	depends on CC_HAS_SANCOV_TRACE_PC || GCC_PLUGINS
 	select DEBUG_FS
 	select GCC_PLUGIN_SANCOV if !CC_HAS_SANCOV_TRACE_PC
@@ -1870,7 +1867,6 @@ config KCOV_ENABLE_COMPARISONS
 config KCOV_INSTRUMENT_ALL
 	bool "Instrument all code by default"
 	depends on KCOV
-	default y
 	help
 	  If you are doing generic system call fuzzing (like e.g. syzkaller),
 	  then you will want to instrument the whole kernel and you should
