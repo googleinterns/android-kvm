@@ -66,7 +66,6 @@ void __kvm_check_ubsan_buffer(void)
 	unsigned long *write_ind;
 	unsigned long it;
 	struct kvm_ubsan_info *slot;
-	pr_err("Check UBSan Buffer\n");
 	init_kvm_debug_buffer(kvm_ubsan_buff, struct kvm_ubsan_info, slot, write_ind);
 	for_each_kvm_debug_buffer_slot(slot, write_ind, it) {
 		__kvm_check_ubsan_data(slot);
