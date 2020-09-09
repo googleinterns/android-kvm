@@ -1297,6 +1297,14 @@ static void cpu_init_hyp_mode(void)
 	BUG_ON(!system_capabilities_finalized());
 	__kvm_call_hyp((void *)pgd_ptr, hyp_stack_ptr, vector_ptr, tpidr_el2);
 
+#ifdef CONFIG_NVHE_KVM_TEST_UBSAN
+	static bool test_ubsan_run;
+
+	if (!test_ubsan_run && (smp_processor_id() == 0)) {
+		test_ubsan_run = true;
+		kvm_call_hyp_nvhe(__kvm_test_ubsan);
+	}
+#endif
 	/*
 	 * Disabling SSBD on a non-VHE system requires us to enable SSBS
 	 * at EL2.

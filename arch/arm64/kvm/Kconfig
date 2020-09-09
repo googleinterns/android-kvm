@@ -60,6 +60,9 @@ config KVM_ARM_PMU
 config KVM_INDIRECT_VECTORS
 	def_bool HARDEN_BRANCH_PREDICTOR || RANDOMIZE_BASE
 
+config NVHE_KVM_TEST_UBSAN
+	def_bool (TEST_UBSAN != n)
+
 endif # KVM
 
 endif # VIRTUALIZATION

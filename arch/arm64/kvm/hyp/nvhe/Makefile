@@ -12,6 +12,7 @@ obj-y += ../vgic-v3-sr.o ../aarch32.o ../vgic-v2-cpuif-proxy.o ../entry.o \
 
 CFLAGS_ubsan.hyp.tmp.o += -I $(srctree)/lib/
 obj-$(CONFIG_UBSAN) += ubsan.o
+obj-$(CONFIG_NVHE_KVM_TEST_UBSAN) += ubsan_test.o
 
 obj-y := $(patsubst %.o,%.hyp.o,$(obj-y))
 extra-y := $(patsubst %.hyp.o,%.hyp.tmp.o,$(obj-y))
