@@ -17,10 +17,37 @@
 	DECLARE_PER_CPU(type_name, buff_name)[(size)];                  \
 	DECLARE_PER_CPU(unsigned long, buff_name##_wr_ind)
 
+static inline void *kvm_debug_buffer_next_slot(void *buff, unsigned long *buff_ind,
+			unsigned int struct_size, unsigned long buff_size)
+{
+	void *res = NULL;
+
+	if (*buff_ind < buff_size) {
+		res = buff + (*buff_ind * struct_size);
+		*buff_ind = *buff_ind + 1;
+	}
+	return res;
+}
+
+#define init_kvm_debug_buffer(buff_name, buff_type, buff_pointer, write_ind)		\
+	do {										\
+		buff = (buff_type *) __hyp_this_cpu_ptr(buff_name);			\
+		buff_ind = (unsigned long *) __hyp_this_cpu_ptr(buff_name##_wr_ind);	\
+	} while (0)
+
 #else
 
-#define DECLARE_KVM_DEBUG_BUFFER(type_name, buff_name, size)            \
-	DECLARE_PER_CPU(type_name, kvm_nvhe_sym(buff_name))[(size)];    \
+#define init_kvm_debug_buffer(buff_name, buff_type, buff_pointer, write_ind)		\
+	do {										\
+		buff_pointer = (buff_type *) this_cpu_ptr_nvhe(buff_name);		\
+		write_ind = (unsigned long *) this_cpu_ptr_nvhe(buff_name##_wr_ind);	\
+	} while (0)
+
+#define for_each_kvm_debug_buffer_slot(slot, write_ind, it)				\
+	for ((it) = 0; (it) < *(write_ind); ++(it), ++(slot))
+
+#define DECLARE_KVM_DEBUG_BUFFER(type_name, buff_name, size)				\
+	DECLARE_PER_CPU(type_name, kvm_nvhe_sym(buff_name))[(size)];			\
 	DECLARE_PER_CPU(unsigned long, kvm_nvhe_sym(buff_name##_wr_ind))
 #endif //__KVM_NVHE_HYPERVISOR__
 
