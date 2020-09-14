@@ -494,6 +494,10 @@ u64 __kvm_call_hyp(void *hypfn, ...);
 		__kvm_call_hyp(kvm_ksym_ref_nvhe(f), ##__VA_ARGS__);	\
 	})
 
+#define __kvm_arm_check_debug_buffer()					\
+{									\
+}
+
 /*
  * The couple of isb() below are there to guarantee the same behaviour
  * on VHE as on !VHE, where the eret to EL1 acts as a context
@@ -506,6 +510,7 @@ u64 __kvm_call_hyp(void *hypfn, ...);
 			isb();						\
 		} else {						\
 			kvm_call_hyp_nvhe(f, ##__VA_ARGS__);		\
+			__kvm_arm_check_debug_buffer();			\
 		}							\
 	} while(0)
 
@@ -518,6 +523,7 @@ u64 __kvm_call_hyp(void *hypfn, ...);
 			isb();						\
 		} else {						\
 			ret = kvm_call_hyp_nvhe_ret(f, ##__VA_ARGS__);	\
+			__kvm_arm_check_debug_buffer();			\
 		}							\
 									\
 		ret;							\
