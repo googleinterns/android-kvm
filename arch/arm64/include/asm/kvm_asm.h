@@ -211,6 +211,11 @@ extern char __smccc_workaround_1_smc[__SMCCC_WORKAROUND_1_SMC_SZ];
 	ldr	\reg,  [\reg, \tmp]
 .endm
 
+.macro hyp_str_this_cpu sym, reg, tmp1, tmp2
+	hyp_adr_this_cpu \tmp1, \sym, \tmp2
+	str	\reg, [\tmp1]
+.endm
+
 .macro get_host_ctxt reg, tmp
 	hyp_adr_this_cpu \reg, kvm_host_data, \tmp
 	add	\reg, \reg, #HOST_DATA_CONTEXT
