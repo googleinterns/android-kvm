@@ -99,7 +99,6 @@ static const test_ubsan_fp test_ubsan_array[] = {
 	test_ubsan_sub_overflow,
 	test_ubsan_mul_overflow,
 	test_ubsan_negate_overflow,
-	test_ubsan_out_of_bounds,
 	test_ubsan_divrem_overflow,
 	test_ubsan_shift_out_of_bounds,
 	test_ubsan_load_invalid_value,

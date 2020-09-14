@@ -41,7 +41,6 @@ config UBSAN_KCOV_BROKEN
 config UBSAN_BOUNDS
 	bool "Perform array index bounds checking"
 	default UBSAN
-	default y
 	depends on !UBSAN_KCOV_BROKEN
 	help
 	  This option enables detection of directly indexed out of bounds
@@ -99,7 +98,8 @@ config UBSAN_ALIGNMENT
 
 config TEST_UBSAN
 	tristate "Module for testing for undefined behavior detection"
-	depends on m
+	depends on UBSAN
+	default m
 	help
 	  This is a test module for UBSAN.
 	  It triggers various undefined behavior, and detect it.
