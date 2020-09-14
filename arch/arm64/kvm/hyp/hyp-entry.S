@@ -68,7 +68,7 @@ el1_sync:				// Guest trapped into EL2
 	cbnz	x1, el1_hvc_guest	// called HVC
 
 	/* Here, we're pretty sure the host called HVC. */
-	ldp	x0, x1, [sp], #16
+	ldp	x0, x1,	[sp], #16
 
 	/* Check for a stub HVC call */
 	cmp	x0, #HVC_STUB_HCALL_NR
