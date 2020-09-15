@@ -12,12 +12,13 @@
 #include <linux/sched.h>
 #include <asm/kvm_debug_buffer.h>
 #include <asm/kvm_hyp.h>
+#include <asm/kvm_kcov.h>
 #include <hyp/switch.h>
 #include <asm/kvm_kcov.h>
 
 DEFINE_KVM_DEBUG_BUFFER(struct kvm_kcov_info, kvm_kcov_buff, KVM_KCOV_BUFFER_SIZE);
 
-static inline struct kvm_kcov_info *kvm_kcov_buffer_next_slot(void)
+static notrace inline struct kvm_kcov_info *kvm_kcov_buffer_next_slot(void)
 {
 	struct kvm_kcov_info *res = NULL;
 	struct kvm_kcov_info *buff;
@@ -30,13 +31,32 @@ static inline struct kvm_kcov_info *kvm_kcov_buffer_next_slot(void)
 	return res;
 }
 
+static inline unsigned long notrace hyp_kern_va(unsigned long ip)
+{
+	unsigned long kern_va;
+	unsigned long offset;
+
+	asm volatile("ldr %0, =%1" : "=r" (kern_va) : "S" (__hyp_panic_string));
+	offset = (unsigned long) __hyp_panic_string - kern_va;
+	ip -= offset;
+	return ip;
+}
+
 /*
- * Entry point from instrumented code. inside EL2
+ * Entry point from instrumented code. inside hyp/nVHE
  * This is called once per basic-block/edge.
  */
 
 void notrace __sanitizer_cov_trace_pc(void)
 {
+	struct kvm_kcov_info *slot;
+	unsigned long ip = hyp_kern_va(_RET_IP_);
+
+	slot = kvm_kcov_buffer_next_slot();
+	if (slot) {
+		slot->ip = ip;
+		slot->type = KCOV_MODE_TRACE_PC;
+	}
 }
 
 #ifdef CONFIG_KCOV_ENABLE_COMPARISONS

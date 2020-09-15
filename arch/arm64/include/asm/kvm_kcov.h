@@ -10,4 +10,7 @@
 
 struct kvm_kcov_info {
 	int type;
+	union {
+		unsigned long ip;
+	};
 };
