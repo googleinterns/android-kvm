@@ -1840,6 +1840,7 @@ config CC_HAS_SANCOV_TRACE_PC
 
 config KCOV
 	bool "Code coverage for fuzzing"
+	default y
 	depends on ARCH_HAS_KCOV
 	depends on CC_HAS_SANCOV_TRACE_PC || GCC_PLUGINS
 	select DEBUG_FS
@@ -1856,6 +1857,7 @@ config KCOV
 
 config KCOV_ENABLE_COMPARISONS
 	bool "Enable comparison operands collection by KCOV"
+	default y
 	depends on KCOV
 	depends on $(cc-option,-fsanitize-coverage=trace-cmp)
 	help
