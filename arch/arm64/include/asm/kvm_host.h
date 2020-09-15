@@ -500,10 +500,18 @@ extern void __kvm_check_ubsan_buffer(void);
 static inline void __kvm_check_ubsan_buffer(void){}
 #endif
 
+#ifdef CONFIG_KCOV
+extern void __kvm_check_kcov_buffer(void);
+#else
+static inline void __kvm_check_kcov_buffer(void){}
+#endif
+
 #define __kvm_arm_check_debug_buffer()					\
 {									\
 	if (IS_ENABLED(CONFIG_UBSAN))					\
 		__kvm_check_ubsan_buffer();				\
+	if (IS_ENABLED(CONFIG_KCOV))					\
+		__kvm_check_kcov_buffer();				\
 }
 
 /*

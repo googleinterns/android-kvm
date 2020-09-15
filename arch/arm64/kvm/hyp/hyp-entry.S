@@ -71,6 +71,10 @@ el1_sync:				// Guest trapped into EL2
 	/* Here, we're pretty sure the host called HVC. */
 	ldp	x0, x1,	[sp], #16
 
+#ifdef CONFIG_KCOV
+	clear_kvm_debug_buffer kvm_kcov_buff_wr_ind, x4, x5, x6
+#endif
+
 	/* Check for a stub HVC call */
 	cmp	x0, #HVC_STUB_HCALL_NR
 	b.hs	1f

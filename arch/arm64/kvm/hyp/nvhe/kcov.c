@@ -13,6 +13,22 @@
 #include <asm/kvm_debug_buffer.h>
 #include <asm/kvm_hyp.h>
 #include <hyp/switch.h>
+#include <asm/kvm_kcov.h>
+
+DEFINE_KVM_DEBUG_BUFFER(struct kvm_kcov_info, kvm_kcov_buff, KVM_KCOV_BUFFER_SIZE);
+
+static inline struct kvm_kcov_info *kvm_kcov_buffer_next_slot(void)
+{
+	struct kvm_kcov_info *res = NULL;
+	struct kvm_kcov_info *buff;
+	unsigned long *buff_ind;
+	unsigned long buff_size = KVM_KCOV_BUFFER_SIZE;
+	unsigned int struct_size = sizeof(struct kvm_kcov_info);
+
+	init_kvm_debug_buffer(kvm_kcov_buff, struct kvm_kcov_info, buff, buff_ind);
+	res = kvm_debug_buffer_next_slot(buff, buff_ind, struct_size, buff_size);
+	return res;
+}
 
 /*
  * Entry point from instrumented code. inside EL2
