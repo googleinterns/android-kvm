@@ -44,7 +44,6 @@
 
 #include <asm/kvm_debug_buffer.h>
 #include <asm/kvm_ubsan.h>
-
 #include <asm/kvm_kcov.h>
 
 #ifdef REQUIRES_VIRT
@@ -1548,6 +1547,16 @@ static int init_hyp_mode(void)
 		kvm_err("Cannot map data section\n");
 		goto out_err;
 	}
+#else
+#ifdef CONFIG_KCOV
+	/* required by ubsan to access the handlers structures fields */
+	err = create_hyp_mappings(kvm_ksym_ref(_data),
+				  kvm_ksym_ref(__end_once), PAGE_HYP_RO);
+	if (err) {
+		kvm_err("Cannot map data section\n");
+		goto out_err;
+	}
+#endif
 #endif
 	err = kvm_map_vectors();
 	if (err) {

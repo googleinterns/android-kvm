@@ -28,5 +28,6 @@ CFLAGS_kvm_ubsan_buffer.o += -I $(srctree)/lib/
 CFLAGS_arm.o += -I $(srctree)/lib
 
 kvm-$(CONFIG_KCOV) += kvm_kcov_buffer.o
+KCOV_INSTRUMENT_kvm_kcov_buffer.o := n
 kvm-$(CONFIG_UBSAN) += kvm_ubsan_buffer.o
 kvm-$(CONFIG_KVM_ARM_PMU)  += pmu-emul.o

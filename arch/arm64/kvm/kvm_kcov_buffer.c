@@ -19,7 +19,7 @@ void notrace __kvm_check_kcov_data(struct kvm_kcov_info *slot)
 {
 	struct task_struct *t;
 	unsigned long *area;
-	unsigned long pos;
+	unsigned long pos, count, max_pos, start_index, end_pos;
 	unsigned long ip = 0;
 
 	t = current;
@@ -35,6 +35,20 @@ void notrace __kvm_check_kcov_data(struct kvm_kcov_info *slot)
 		if (likely(pos < t->kcov_size)) {
 			area[pos] = ip;
 			WRITE_ONCE(area[0], pos);
+		}
+	} else if (check_kcov_mode(slot, KCOV_MODE_TRACE_CMP, t->kcov_mode)) {
+		max_pos = t->kcov_size * sizeof(unsigned long);
+		count = READ_ONCE(area[0]);
+
+		/* Every record is KCOV_WORDS_PER_CMP 64-bit words. */
+		start_index = 1 + count * KCOV_WORDS_PER_CMP;
+		end_pos = (start_index + KCOV_WORDS_PER_CMP) * sizeof(u64);
+		if (likely(end_pos <= max_pos)) {
+			area[start_index] = slot->comp_data.type;
+			area[start_index + 1] = slot->comp_data.arg1;
+			area[start_index + 2] = slot->comp_data.arg2;
+			area[start_index + 3] = ip;
+			WRITE_ONCE(area[0], count + 1);
 		}
 	}
 }
